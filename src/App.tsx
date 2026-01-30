@@ -75,7 +75,7 @@ function App() {
     ordersToCollect;
   });
 
-  const onCollect = (collect: Collect) => {
+  const onCollect = (_collect: Collect) => {
     setOpen(false);
   };
 
