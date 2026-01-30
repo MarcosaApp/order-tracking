@@ -43,35 +43,47 @@ interface Values {
   modifier?: string;
 }
 
+interface Collect {
+  collectId: string;
+  quantity: number;
+}
 interface OrderValues {
+  status: string;
   product: string;
   quantity: number;
   reference: string;
   driver: string;
+  collects?: Collect[];
+}
+
+interface OrdersToCollect {
+  orderId: string;
+  orders: OrderValues[];
 }
 
 function App() {
   const [orderForm] = Form.useForm();
   const [collectForm] = Form.useForm();
 
-  const [_formValues, setFormValues] = useState<Values>();
+  // const [collectValues, setCollectValues] = useState<Values>();
   const [orderValues, setOrderValues] = useState<OrderValues[]>([]);
-  const [orderValuesWithOrder, setOrderValuesWithOrder] = useState([]);
+  const [ordersToCollect, setOrdersToCollect] = useState<OrdersToCollect[]>([]);
 
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    console.log({ orderValues });
+    ordersToCollect;
   });
 
-  const onCreate = (values: Values) => {
-    console.log("Received values of form: ", values);
-    setFormValues(values);
+  const onCollect = (collect: Collect) => {
     setOpen(false);
   };
 
   const onFinish = (values: OrderValues) => {
-    setOrderValues((prevItems) => [...prevItems, values]);
+    setOrderValues((prevItems) => [
+      ...prevItems,
+      { ...values, status: "PENDIENTE" },
+    ]);
     orderForm.resetFields();
   };
 
@@ -259,6 +271,10 @@ function App() {
                 htmlType="submit"
                 style={{ width: "100%" }}
                 onClick={() => {
+                  setOrdersToCollect((prevItems) => [
+                    ...prevItems,
+                    { orderId: crypto.randomUUID(), orders: orderValues },
+                  ]);
                   setOrderValues([]);
                 }}
               >
@@ -277,7 +293,7 @@ function App() {
                 padding: "8px",
               }}
             >
-              {ordersPackage.map((order) =>
+              {ordersToCollect.map((order) =>
                 order ? (
                   <Card title={order.orderId}>
                     {order.orders?.map((item) => (
@@ -300,7 +316,7 @@ function App() {
                           <Typography.Text>Cantidad:</Typography.Text>
                         </Flex>
                         <Flex justify="center" style={{ width: "100%" }}>
-                          <Title level={2}>{item.quantity}/600</Title>
+                          <Title level={2}>{item.quantity}/0</Title>
                         </Flex>
                         <Flex gap="middle">
                           <Typography.Text>Recolectas:</Typography.Text>
@@ -331,27 +347,18 @@ function App() {
                                 name="form_in_modal"
                                 initialValues={{ modifier: "public" }}
                                 clearOnDestroy
-                                onFinish={onCreate}
+                                onFinish={(values) => onCollect(values)}
                               >
                                 {dom}
                               </Form>
                             )}
                           >
-                            <Form.Item name="driver" label="Piloto">
-                              <Select
-                                options={[
-                                  { value: "Juan", label: "Juan" },
-                                  { value: "Luis", label: "Luis" },
-                                ]}
-                                style={{ width: "50%" }}
-                              ></Select>
-                            </Form.Item>
                             <Form.Item name="quantity" label="Cantidad">
                               <Input type="number" />
                             </Form.Item>
                           </Modal>
                         </Flex>
-                        {item.collects.map((collect) => (
+                        {item.collects?.map((collect) => (
                           <>
                             <Flex gap="middle">
                               <Typography.Text>
