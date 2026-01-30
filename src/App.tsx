@@ -56,9 +56,7 @@ function App() {
 
   const [_formValues, setFormValues] = useState<Values>();
   const [orderValues, setOrderValues] = useState<OrderValues[]>([]);
-  const [orderValuesWithOrder, setOrderValuesWithOrder] = useState<
-    OrderValues[]
-  >([]);
+  const [orderValuesWithOrder, setOrderValuesWithOrder] = useState([]);
 
   const [open, setOpen] = useState(false);
 
@@ -260,9 +258,9 @@ function App() {
                 type="primary"
                 htmlType="submit"
                 style={{ width: "100%" }}
-                onClick={() =>
-                  console.log("Ready to create the order: ", orderValues)
-                }
+                onClick={() => {
+                  setOrderValues([]);
+                }}
               >
                 CREAR ORDEN
               </Button>
