@@ -12,14 +12,27 @@ import {
   Tag,
   Modal,
   Form,
-  Table,
-  Divider,
+  message,
+  Collapse,
+  Upload,
+  Image,
+  type GetProp,
+  type UploadProps,
 } from "antd";
 import "./App.css";
 import { Content, Header } from "antd/es/layout/layout";
 import Title from "antd/es/typography/Title";
 import { useEffect, useState } from "react";
-import { PlusOutlined } from "@ant-design/icons";
+import {
+  LoadingOutlined,
+  PlusOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
+import { BASE_URL, HttpService } from "./services/http.service";
+import { formatTimeAgo } from "./utils/date.utils";
+import { ENTITIES } from "./enums";
+import Search from "antd/es/input/Search";
+import logo from "./assets/logo.jpeg";
 
 const layoutStyle = {
   // backgroundColor: "black",
@@ -28,8 +41,7 @@ const layoutStyle = {
 
 const headerStyle: React.CSSProperties = {
   height: "10vh",
-  backgroundColor: "#4096ff",
-  // background: "#f5f5f5",
+  backgroundColor: "black",
 };
 
 const contentStyle: React.CSSProperties = {
@@ -37,353 +49,778 @@ const contentStyle: React.CSSProperties = {
   height: "90vh",
 };
 
-interface Values {
-  title?: string;
-  description?: string;
-  modifier?: string;
+interface OrderEntity {
+  id: string;
+  status?: string | undefined;
+  createdAt: number;
+  updateAt: number;
 }
 
-interface Collect {
-  collectId: string;
-  quantity: number;
-}
-interface OrderValues {
-  status: string;
+interface ItemEntity {
+  id: string;
+  voucherId: string;
+  orderId: string;
   product: string;
   quantity: number;
-  reference: string;
-  driver: string;
-  collects?: Collect[];
+  voucherLink?: string;
+  status?: string;
+  createdAt: number;
+  updateAt: number;
 }
 
-interface OrdersToCollect {
-  orderId: string;
-  orders: OrderValues[];
+interface CollectEntity {
+  id?: string;
+  voucherId: string;
+  driver: string;
+  truck: string;
+  quantity: number;
+  createdAt?: number;
+  updateAt?: number;
 }
+
+interface GetAllOrders {
+  items: OrderEntity[];
+  cursor?:
+    | {
+        [key: string]: any;
+      }
+    | undefined;
+}
+
+const httpClient = new HttpService();
 
 function App() {
-  const [orderForm] = Form.useForm();
-  const [collectForm] = Form.useForm();
+  const [messageApi, contextHolder] = message.useMessage();
 
-  // const [collectValues, setCollectValues] = useState<Values>();
-  const [orderValues, setOrderValues] = useState<OrderValues[]>([]);
-  const [ordersToCollect, setOrdersToCollect] = useState<OrdersToCollect[]>([]);
+  const [itemForm] = Form.useForm<ItemEntity>();
+  const [collectForm] = Form.useForm<CollectEntity>();
+
+  const [orders, setOrders] = useState<OrderEntity[]>([]);
+  const [items, setItems] = useState<ItemEntity[]>([]);
+  const [collects, setCollects] = useState<CollectEntity[]>([]);
+
+  const [searchedItem, setSearchedItem] = useState<ItemEntity>();
 
   const [open, setOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [imageUrl, setImageUrl] = useState<string>();
+
+  const { Search: SearchText } = Input;
 
   useEffect(() => {
-    ordersToCollect;
-  });
+    getAllOrders();
+  }, []);
 
-  const onCollect = (_collect: Collect) => {
+  const getAllOrders = async () => {
+    const orders = await httpClient.getAll<GetAllOrders>("order", messageApi);
+    if (orders) {
+      setOrders(orders.items);
+    }
+  };
+
+  const onCreateOrder = async () => {
+    const order = await httpClient.createOrder<OrderEntity>(
+      ENTITIES.ORDER,
+      messageApi,
+    );
+
+    if (order) {
+      await getAllOrders();
+    }
+  };
+
+  const onCreateItem = async (item: ItemEntity) => {
+    if (item.orderId) {
+      const itemCreated = await httpClient.createEntity<ItemEntity>(
+        ENTITIES.ITEM,
+        messageApi,
+        item,
+      );
+
+      if (itemCreated) {
+        setItems((prevItems) => [...prevItems, { ...itemCreated }]);
+
+        messageApi.success({
+          type: "success",
+          content: "Pedido creado exitosamente",
+        });
+      }
+    }
+
     setOpen(false);
   };
 
-  const onFinish = (values: OrderValues) => {
-    setOrderValues((prevItems) => [
-      ...prevItems,
-      { ...values, status: "PENDIENTE" },
-    ]);
-    orderForm.resetFields();
+  const onChangeItemCollapse = async (
+    key: string | string[],
+    orderId: string,
+  ) => {
+    const [entity] = key;
+    if (entity === ENTITIES.ITEM) {
+      const itemResult = await httpClient.getEntitiesByOrder<ItemEntity>(
+        entity,
+        orderId,
+        messageApi,
+      );
+
+      if (itemResult?.items) {
+        setItems(itemResult.items);
+      }
+    }
   };
 
-  const onFinishFailed = (errorInfo: any) => {
-    console.log("Failed:", errorInfo);
+  const onChangeCollectCollapse = async (
+    key: string | string[],
+    itemId: string,
+  ) => {
+    const [entity] = key;
+    if (entity === ENTITIES.COLLECT) {
+      const collectsResult = await httpClient.getCollectsByItem<CollectEntity>(
+        itemId,
+        messageApi,
+      );
+
+      if (collectsResult?.items) {
+        setCollects(collectsResult.items);
+      }
+    }
   };
 
-  const columns = [
-    {
-      title: "Referencia",
-      dataIndex: "reference",
-      key: "reference",
-    },
-    {
-      title: "Producto",
-      dataIndex: "product",
-      key: "product",
-    },
-    {
-      title: "Cantidad",
-      dataIndex: "quantity",
-      key: "quantity",
-    },
-    {
-      title: "Piloto",
-      dataIndex: "driver",
-      key: "driver",
-    },
-  ];
+  const onSearch = async (searchValue: string) => {
+    setIsLoading(true);
 
-  const ordersPackage = [
-    {
-      orderId: "Pedido #100",
-      orders: [
-        {
-          status: "PENDIENTE",
-          product: "Cemento",
-          quantity: 1200,
-          reference: "8520-4580",
-          driver: "Jose Barrios",
-          collects: [
-            { collectId: "#1", quantity: 300 },
-            { collectId: "#2", quantity: 600 },
-          ],
-        },
-        {
-          status: "PENDIENTE",
-          product: "Block",
-          quantity: 900,
-          reference: "7410-8520",
-          driver: "Jose Barrios",
-          collects: [
-            { collectId: "#1", quantity: 300 },
-            { collectId: "#2", quantity: 600 },
-          ],
-        },
-      ],
-    },
-  ];
+    const searchResult = await httpClient.getEntity<ItemEntity>(
+      ENTITIES.ITEM,
+      messageApi,
+      searchValue,
+    );
+
+    setIsLoading(false);
+    setSearchedItem(searchResult);
+  };
+
+  const onCollectCreated = async (collect: CollectEntity, itemId: string) => {
+    const { driver, truck, quantity } = collect;
+    const collectCreated = await httpClient.createEntity<CollectEntity>(
+      ENTITIES.COLLECT,
+      messageApi,
+      {
+        voucherId: itemId,
+        driver,
+        truck,
+        quantity,
+      },
+    );
+
+    if (collectCreated) {
+      messageApi.success({
+        type: "success",
+        content: "Recolecta creada exitosamente",
+      });
+
+      setCollects((prevItems) => [...prevItems, { ...collectCreated }]);
+    }
+
+    setOpen(false);
+  };
+
+  type FileType = Parameters<GetProp<UploadProps, "beforeUpload">>[0];
+
+  const beforeUpload = (file: FileType) => {
+    const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
+    if (!isJpgOrPng) {
+      message.error("You can only upload JPG/PNG file!");
+    }
+    const isLt2M = file.size / 1024 / 1024 < 2;
+    if (!isLt2M) {
+      message.error("Image must smaller than 2MB!");
+    }
+    return isJpgOrPng && isLt2M;
+  };
+
+  const getBase64 = (img: FileType, callback: (url: string) => void) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => callback(reader.result as string));
+    reader.readAsDataURL(img);
+  };
+
+  const handleChange: UploadProps["onChange"] = (info) => {
+    console.log({ info });
+    if (info.file.status === "uploading") {
+      setIsLoading(true);
+      return;
+    }
+
+    if (info.file.status === "done") {
+      getBase64(info.file.originFileObj as FileType, (url) => {
+        setIsLoading(false);
+        setImageUrl(url);
+      });
+    }
+  };
+
+  const customRequest: UploadProps["customRequest"] = async ({
+    file,
+    onSuccess,
+    onError,
+  }) => {
+    if (file instanceof File) {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+
+      reader.onload = async () => {
+        const base64Data = reader.result?.toString().split(",")[1];
+
+        const payload = {
+          imageBody: base64Data,
+          fileName: file.name,
+          contentType: file.type,
+        };
+
+        try {
+          const response = await fetch(`${BASE_URL}/manager/image/upload`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json();
+          if (onSuccess) {
+            onSuccess(data);
+          }
+          message.success(`${file.name} uploaded successfully!`);
+        } catch (error) {
+          console.error("Upload error:", error);
+          if (onError) {
+            // onError({});
+          }
+          message.error(`${file.name} upload failed.`);
+        }
+      };
+
+      reader.onerror = (error) => {
+        // onError(error);
+        message.error(`File reading failed: ${error}`);
+      };
+    }
+  };
+
+  const isAdmin = true;
 
   return (
     <Row>
-      <Col xl={8} md={6} xs={24}></Col>
+      <Col xl={8} md={6} xs={24} style={{ background: "#8c8c8c" }}></Col>
       <Col xl={8} md={12} xs={24}>
         <Layout style={layoutStyle}>
+          <>{contextHolder}</>
           <Header style={headerStyle}>
-            <Flex
-              justify="center"
-              align="center"
-              vertical
-              style={{ height: "100%" }}
-            >
-              <Title level={4} style={{ margin: 0 }}>
-                CONTROL DE ORDENES
-              </Title>
+            <Flex justify="center" align="center" style={{ height: "100%" }}>
+              <Image src={logo} height={"inherit"}></Image>
+              {/* <Title level={4} style={{ margin: 0 }}>
+                CONTROL DE ORDENES Y ENTREGAS
+              </Title> */}
             </Flex>
           </Header>
           <Content style={contentStyle}>
-            {/* CREACION DE PEDIDO */}
-            <Flex
-              align="start"
-              justify="space-between"
-              vertical
-              style={{ height: "auto", padding: "12px" }}
-            >
-              <Form
-                name="basic"
-                style={{ width: "100%" }}
-                onFinish={onFinish}
-                onFinishFailed={onFinishFailed}
-                autoComplete="off"
-                form={orderForm}
-                initialValues={{ modifier: "public" }}
-                clearOnDestroy
-              >
-                <Form.Item name="reference">
-                  <Flex style={{ width: "100%" }}>
-                    <Input
-                      placeholder="Ingresar numero de comprobante"
-                      name="reference"
-                    ></Input>
-                  </Flex>
-                </Form.Item>
-
-                <Form.Item name="driver">
-                  <Select
-                    placeholder="Asignar piloto"
-                    options={[
-                      {
-                        value: "Erick Geovanny Arana Ortiz",
-                        label: "Erick Geovanny Arana Ortiz",
-                      },
-                      {
-                        value: "Jose Castellanos Barrios Gonzalez",
-                        label: "Jose Castellanos Barrios Gonzalez",
-                      },
-                    ]}
+            {isAdmin ? (
+              <>
+                <Flex
+                  align="start"
+                  justify={"center"}
+                  vertical
+                  style={{
+                    height: "10%",
+                    padding: "12px",
+                  }}
+                >
+                  <Button
+                    type="primary"
+                    htmlType="submit"
                     style={{ width: "100%" }}
-                  ></Select>
-                </Form.Item>
+                    onClick={onCreateOrder}
+                  >
+                    CREAR ORDEN
+                  </Button>
+                </Flex>
 
                 <Flex
-                  justify="space-between"
-                  align="center"
-                  style={{ width: "100%" }}
+                  className="hide-scrollbar"
+                  vertical
+                  gap="small"
+                  style={{
+                    overflow: "scroll",
+                    height: "90%",
+                    padding: "8px",
+                    background: "black",
+                  }}
                 >
-                  <Form.Item
-                    label="Producto:"
-                    name="product"
-                    layout="vertical"
-                    style={{ width: "40%" }}
-                  >
-                    <Select
-                      options={[
-                        { value: "Block", label: "Block" },
-                        { value: "Cemento", label: "Cemento" },
-                      ]}
-                    ></Select>
-                  </Form.Item>
-
-                  <Form.Item
-                    label="Cantidad:"
-                    name="quantity"
-                    layout="vertical"
-                    style={{ width: "40%" }}
-                  >
-                    <Flex style={{ width: "100%" }}>
-                      <InputNumber style={{ width: "100%" }}></InputNumber>
-                    </Flex>
-                  </Form.Item>
-
-                  <Form.Item style={{ margin: 0 }}>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      shape="circle"
-                      icon={<PlusOutlined />}
-                    ></Button>
-                  </Form.Item>
-                </Flex>
-              </Form>
-
-              <Flex
-                align="start"
-                style={{ width: "100%", padding: 5 }}
-                vertical
-              >
-                {orderValues.length ? (
-                  <Table
-                    style={{ marginBottom: 10 }}
-                    dataSource={orderValues}
-                    columns={columns}
-                    size="small"
-                    pagination={false}
-                    tableLayout="fixed"
-                    locale={{ emptyText: "" }}
-                  />
-                ) : (
-                  <></>
-                )}
-              </Flex>
-
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{ width: "100%" }}
-                onClick={() => {
-                  setOrdersToCollect((prevItems) => [
-                    ...prevItems,
-                    { orderId: crypto.randomUUID(), orders: orderValues },
-                  ]);
-                  setOrderValues([]);
-                }}
-              >
-                CREAR ORDEN
-              </Button>
-            </Flex>
-
-            {/* LISTADO DE PEDIDOS */}
-            <Flex
-              className="hide-scrollbar"
-              vertical
-              gap="small"
-              style={{
-                overflow: "scroll",
-                height: "65%",
-                padding: "8px",
-              }}
-            >
-              {ordersToCollect.map((order) =>
-                order ? (
-                  <Card title={order.orderId}>
-                    {order.orders?.map((item) => (
-                      <Flex vertical gap="small" style={{ margin: 10 }}>
-                        <Flex gap="middle">
-                          <Typography.Text>Piloto:</Typography.Text>
-                          <Typography.Text>{item.driver}</Typography.Text>
-                        </Flex>
-                        <Flex gap="middle">
-                          <Typography.Text>Estado:</Typography.Text>
-                          <Tag key={"red"} color={"red"} variant="solid">
-                            {item.status}
-                          </Tag>
-                        </Flex>
-                        <Flex gap="middle">
-                          <Typography.Text>Producto:</Typography.Text>
-                          <Typography.Text>{item.product}</Typography.Text>
-                        </Flex>
-                        <Flex>
-                          <Typography.Text>Cantidad:</Typography.Text>
-                        </Flex>
-                        <Flex justify="center" style={{ width: "100%" }}>
-                          <Title level={2}>{item.quantity}/0</Title>
-                        </Flex>
-                        <Flex gap="middle">
-                          <Typography.Text>Recolectas:</Typography.Text>
-                        </Flex>
-                        <Flex gap="middle">
-                          <Button
-                            type="primary"
-                            style={{ width: "100%", marginBottom: 10 }}
-                            onClick={() => setOpen(true)}
-                          >
-                            AGREGAR
-                          </Button>
-                          <Modal
-                            open={open}
-                            title="Crear recolecta"
-                            okText="Crear"
-                            cancelText="Cancelar"
-                            okButtonProps={{
-                              autoFocus: true,
-                              htmlType: "submit",
-                            }}
-                            onCancel={() => setOpen(false)}
-                            destroyOnHidden
-                            modalRender={(dom) => (
-                              <Form
-                                layout="vertical"
-                                form={collectForm}
-                                name="form_in_modal"
-                                initialValues={{ modifier: "public" }}
-                                clearOnDestroy
-                                onFinish={(values) => onCollect(values)}
-                              >
-                                {dom}
-                              </Form>
-                            )}
-                          >
-                            <Form.Item name="quantity" label="Cantidad">
-                              <Input type="number" />
-                            </Form.Item>
-                          </Modal>
-                        </Flex>
-                        {item.collects?.map((collect) => (
-                          <>
-                            <Flex gap="middle">
-                              <Typography.Text>
-                                Recolecta {collect.collectId}
-                              </Typography.Text>
-                              <Typography.Text>-----</Typography.Text>
-                              <Typography.Text>
-                                Cantidad: {collect.quantity}
-                              </Typography.Text>
+                  {orders.length ? (
+                    orders.map((order) => (
+                      <Card title={order.id} id={order.id} key={order.id}>
+                        <Flex gap={"middle"} vertical>
+                          <Flex justify={"space-between"}>
+                            <Flex gap={"middle"}>
+                              <Typography.Text>Estado:</Typography.Text>
+                              <Tag key={"red"} color={"red"} variant="solid">
+                                {order.status}
+                              </Tag>
                             </Flex>
-                          </>
-                        ))}
-                        <Divider />
+
+                            <Typography.Text>
+                              {formatTimeAgo(order.createdAt * 1000)}
+                            </Typography.Text>
+                          </Flex>
+                          <Collapse
+                            accordion
+                            items={[
+                              {
+                                key: "item",
+                                label: "Pedidos",
+                                children: (
+                                  <Flex gap="middle" vertical>
+                                    <Button
+                                      type="primary"
+                                      style={{
+                                        width: "100%",
+                                        marginBottom: 10,
+                                      }}
+                                      onClick={() => setOpen(true)}
+                                    >
+                                      AGREGAR
+                                    </Button>
+                                    <Modal
+                                      open={open}
+                                      title="Crear pedido"
+                                      okText="Crear"
+                                      cancelText="Cancelar"
+                                      okButtonProps={{
+                                        autoFocus: true,
+                                        htmlType: "submit",
+                                      }}
+                                      onCancel={() => setOpen(false)}
+                                      destroyOnHidden
+                                      modalRender={(dom) => (
+                                        <Form
+                                          autoComplete="off"
+                                          layout="vertical"
+                                          form={itemForm}
+                                          name="item_form"
+                                          initialValues={{ modifier: "public" }}
+                                          clearOnDestroy
+                                          onFinish={(values) => {
+                                            console.log({ values });
+                                            onCreateItem({
+                                              ...values,
+                                              orderId: order.id,
+                                            });
+                                          }}
+                                        >
+                                          {dom}
+                                        </Form>
+                                      )}
+                                    >
+                                      <Flex justify={"space-between"}>
+                                        <Form.Item
+                                          name="voucherId"
+                                          label="Comprobante"
+                                          layout="vertical"
+                                          rules={[
+                                            {
+                                              required: true,
+                                              message: "Campo requerido",
+                                            },
+                                          ]}
+                                          style={{ width: "60%" }}
+                                        >
+                                          <Input name="reference"></Input>
+                                        </Form.Item>
+
+                                        <Form.Item name="voucherLink">
+                                          <Upload
+                                            maxCount={1}
+                                            multiple={false}
+                                            name="voucher"
+                                            listType={"picture-card"}
+                                            className="avatar-uploader"
+                                            beforeUpload={beforeUpload}
+                                            onChange={handleChange}
+                                            action={`${BASE_URL}/manager/image/upload`}
+                                            showUploadList={false}
+                                            customRequest={customRequest}
+                                          >
+                                            {imageUrl ? (
+                                              <img
+                                                draggable={false}
+                                                src={imageUrl}
+                                                alt="avatar"
+                                                style={{ width: "100%" }}
+                                              />
+                                            ) : (
+                                              <button
+                                                style={{
+                                                  border: 0,
+                                                  background: "none",
+                                                }}
+                                                type="button"
+                                              >
+                                                {isLoading ? (
+                                                  <LoadingOutlined />
+                                                ) : (
+                                                  <PlusOutlined />
+                                                )}
+                                                <div style={{ marginTop: 8 }}>
+                                                  Subir
+                                                </div>
+                                              </button>
+                                            )}
+                                          </Upload>
+                                        </Form.Item>
+                                      </Flex>
+
+                                      <Form.Item
+                                        name="quantity"
+                                        label="Cantidad"
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: "Campo requerido",
+                                          },
+                                        ]}
+                                      >
+                                        <InputNumber
+                                          type="number"
+                                          style={{ width: "100%" }}
+                                        />
+                                      </Form.Item>
+
+                                      <Form.Item
+                                        label="Producto:"
+                                        name="product"
+                                        layout="vertical"
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: "Campo requerido",
+                                          },
+                                        ]}
+                                      >
+                                        <Select
+                                          options={[
+                                            { value: "Block", label: "Block" },
+                                            {
+                                              value: "Cemento",
+                                              label: "Cemento",
+                                            },
+                                          ]}
+                                        ></Select>
+                                      </Form.Item>
+                                    </Modal>
+
+                                    {items.map((item) => (
+                                      <Collapse
+                                        accordion
+                                        size={"small"}
+                                        key={item.id}
+                                        items={[
+                                          {
+                                            key: item?.voucherId,
+                                            label: `Comprobante - ${item?.voucherId}`,
+                                            children: (
+                                              <Flex vertical gap="small">
+                                                <Flex gap={"middle"}>
+                                                  <Typography.Text>
+                                                    {formatTimeAgo(
+                                                      item.createdAt * 1000,
+                                                    )}
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex gap={"middle"}>
+                                                  <Typography.Text>
+                                                    Estado:
+                                                  </Typography.Text>
+                                                  <Tag
+                                                    key={"red"}
+                                                    color={"red"}
+                                                    variant="solid"
+                                                  >
+                                                    {item.status}
+                                                  </Tag>
+                                                </Flex>
+                                                <Flex gap="middle">
+                                                  <Typography.Text>
+                                                    Producto:
+                                                  </Typography.Text>
+                                                  <Typography.Text strong>
+                                                    {item.product}
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex>
+                                                  <Typography.Text>
+                                                    Cantidad:
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex
+                                                  justify="center"
+                                                  style={{ width: "100%" }}
+                                                >
+                                                  <Title
+                                                    level={2}
+                                                    style={{
+                                                      margin: 0,
+                                                      padding: 10,
+                                                    }}
+                                                  >
+                                                    {item.quantity}/0
+                                                  </Title>
+                                                </Flex>
+                                              </Flex>
+                                            ),
+                                          },
+                                        ]}
+                                      ></Collapse>
+                                    ))}
+                                  </Flex>
+                                ),
+                              },
+                            ]}
+                            onChange={(key) => {
+                              onChangeItemCollapse(key, order.id);
+                            }}
+                          />
+                        </Flex>
+                      </Card>
+                    ))
+                  ) : (
+                    <Flex></Flex>
+                  )}
+                </Flex>
+              </>
+            ) : (
+              <>
+                <Flex
+                  align="center"
+                  justify={"space-between"}
+                  style={{ height: "10%", padding: "12px" }}
+                >
+                  <SearchText
+                    allowClear
+                    placeholder="comprobante"
+                    enterButton
+                    loading={isLoading}
+                    onSearch={onSearch}
+                  />
+                </Flex>
+
+                <Flex
+                  className="hide-scrollbar"
+                  vertical
+                  gap="small"
+                  style={{
+                    overflow: "scroll",
+                    height: "90%",
+                    padding: "8px",
+                    // background: "green",
+                  }}
+                >
+                  {searchedItem ? (
+                    <Card
+                      title={`Comprobante - ${searchedItem?.voucherId}`}
+                      id={searchedItem.id}
+                      key={searchedItem.id}
+                    >
+                      <Flex gap={"middle"} vertical>
+                        <Flex justify={"space-between"}>
+                          <Flex gap={"middle"}>
+                            <Typography.Text>Estado:</Typography.Text>
+                            <Tag key={"red"} color={"red"} variant="solid">
+                              {searchedItem.status}
+                            </Tag>
+                          </Flex>
+
+                          <Typography.Text>
+                            {formatTimeAgo(searchedItem.createdAt * 1000)}
+                          </Typography.Text>
+                        </Flex>
+
+                        <Collapse
+                          accordion
+                          items={[
+                            {
+                              key: "collect",
+                              label: "Recolectas",
+                              children: (
+                                <Flex gap="middle" vertical>
+                                  <Button
+                                    type="primary"
+                                    style={{
+                                      width: "100%",
+                                      marginBottom: 10,
+                                    }}
+                                    onClick={() => setOpen(true)}
+                                  >
+                                    AGREGAR
+                                  </Button>
+                                  <Modal
+                                    open={open}
+                                    title="Crear recolecta"
+                                    okText="Crear"
+                                    cancelText="Cancelar"
+                                    okButtonProps={{
+                                      autoFocus: true,
+                                      htmlType: "submit",
+                                    }}
+                                    onCancel={() => setOpen(false)}
+                                    destroyOnHidden
+                                    modalRender={(dom) => (
+                                      <Form
+                                        autoComplete="off"
+                                        layout="vertical"
+                                        form={collectForm}
+                                        name="collect_form"
+                                        initialValues={{ modifier: "public" }}
+                                        clearOnDestroy
+                                        onFinish={(values) => {
+                                          onCollectCreated(
+                                            values,
+                                            searchedItem.id,
+                                          );
+                                        }}
+                                      >
+                                        {dom}
+                                      </Form>
+                                    )}
+                                  >
+                                    <Form.Item
+                                      name="driver"
+                                      label="Piloto"
+                                      layout="vertical"
+                                      rules={[
+                                        {
+                                          required: true,
+                                          message: "Campo requerido",
+                                        },
+                                      ]}
+                                    >
+                                      <Input name="reference"></Input>
+                                    </Form.Item>
+
+                                    <Form.Item
+                                      name="truck"
+                                      label="Camion"
+                                      layout="vertical"
+                                      rules={[
+                                        {
+                                          required: true,
+                                          message: "Campo requerido",
+                                        },
+                                      ]}
+                                    >
+                                      <Input name="reference"></Input>
+                                    </Form.Item>
+
+                                    <Form.Item
+                                      name="quantity"
+                                      label="Cantidad"
+                                      rules={[
+                                        {
+                                          required: true,
+                                          message: "Campo requerido",
+                                        },
+                                      ]}
+                                    >
+                                      <InputNumber
+                                        type="number"
+                                        style={{ width: "100%" }}
+                                      />
+                                    </Form.Item>
+                                  </Modal>
+
+                                  {collects.map((collect, index) => (
+                                    <Collapse
+                                      // bordered={false}
+                                      accordion
+                                      size={"small"}
+                                      key={collect.id}
+                                      items={[
+                                        {
+                                          key: collect.voucherId,
+                                          label: `Recolecta - ${index + 1}`,
+                                          children: (
+                                            <Flex vertical gap="small">
+                                              <Flex gap={"middle"}>
+                                                <Typography.Text>
+                                                  {formatTimeAgo(
+                                                    collect.createdAt! * 1000,
+                                                  )}
+                                                </Typography.Text>
+                                              </Flex>
+                                              <Flex gap={"middle"}>
+                                                <Typography.Text>
+                                                  Piloto:
+                                                </Typography.Text>
+                                                <Tag
+                                                  key={"red"}
+                                                  color={"red"}
+                                                  variant="solid"
+                                                >
+                                                  {collect.driver}
+                                                </Tag>
+                                              </Flex>
+                                              <Flex gap="middle">
+                                                <Typography.Text>
+                                                  Camion:
+                                                </Typography.Text>
+                                                <Typography.Text strong>
+                                                  {collect.truck}
+                                                </Typography.Text>
+                                              </Flex>
+                                              <Flex>
+                                                <Typography.Text>
+                                                  Cantidad:
+                                                </Typography.Text>
+                                              </Flex>
+                                              <Flex
+                                                justify="center"
+                                                style={{ width: "100%" }}
+                                              >
+                                                <Title
+                                                  level={2}
+                                                  style={{
+                                                    margin: 0,
+                                                    padding: 10,
+                                                  }}
+                                                >
+                                                  {collect.quantity}
+                                                </Title>
+                                              </Flex>
+                                            </Flex>
+                                          ),
+                                        },
+                                      ]}
+                                    ></Collapse>
+                                  ))}
+                                </Flex>
+                              ),
+                            },
+                            { key: "deliveries", label: "Entregas" },
+                          ]}
+                          onChange={(key) => {
+                            onChangeCollectCollapse(key, searchedItem.id);
+                          }}
+                        />
                       </Flex>
-                    ))}
-                  </Card>
-                ) : (
-                  <></>
-                ),
-              )}
-            </Flex>
+                    </Card>
+                  ) : (
+                    <></>
+                  )}
+                </Flex>
+              </>
+            )}
           </Content>
         </Layout>
       </Col>
-      <Col xl={8} md={6} xs={24}></Col>
+      <Col xl={8} md={6} xs={24} style={{ background: "#8c8c8c" }}></Col>
     </Row>
   );
 }
