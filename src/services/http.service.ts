@@ -49,13 +49,12 @@ export class HttpService {
     }
   }
 
-  async getEntitiesByOrder<T>(
-    entity: string,
+  async getItemsByOrder<T>(
     orderId: string,
     messageApi: MessageInstance,
   ): Promise<QueryResponse<T> | undefined> {
     try {
-      const request = await fetch(`${BASE_URL}/manager/${entity}/${orderId}`, {
+      const request = await fetch(`${BASE_URL}/manager/items/${orderId}`, {
         method: "GET",
       });
 
@@ -66,7 +65,7 @@ export class HttpService {
       const response = (await request.json()) as TResponse<QueryResponse<T>>;
 
       if (response.error) {
-        throw new Error(`Error creando la entidad: ${entity}`);
+        throw new Error(`Error al obtener los registros`);
       }
 
       return response.data;
@@ -89,9 +88,6 @@ export class HttpService {
     try {
       const request = await fetch(
         `${BASE_URL}/manager/collect/item/${voucherId}`,
-        {
-          method: "GET",
-        },
       );
 
       if (!request.ok) {
@@ -102,6 +98,38 @@ export class HttpService {
 
       if (response.error) {
         throw new Error("Error creando la entidad");
+      }
+
+      return response.data;
+    } catch (error) {
+      if (error instanceof Error) {
+        messageApi.error({
+          type: "error",
+          content: error.message,
+        });
+      }
+
+      return;
+    }
+  }
+
+  async getDeliveriesByItem<T>(
+    voucherId: string,
+    messageApi: MessageInstance,
+  ): Promise<QueryResponse<T> | undefined> {
+    try {
+      const request = await fetch(
+        `${BASE_URL}/manager/delivery/item/${voucherId}`,
+      );
+
+      if (!request.ok) {
+        throw new Error("Error enviando la peticion al servidor");
+      }
+
+      const response = (await request.json()) as TResponse<QueryResponse<T>>;
+
+      if (response.error) {
+        throw new Error("Error al obtener los registros");
       }
 
       return response.data;

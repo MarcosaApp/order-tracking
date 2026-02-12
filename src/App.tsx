@@ -78,6 +78,18 @@ interface CollectEntity {
   updateAt?: number;
 }
 
+interface DeliveryEntity {
+  id?: string;
+  voucherId: string;
+  driver: string;
+  truck: string;
+  quantity: number;
+  customer: string;
+  voucherLink?: string;
+  createdAt?: number;
+  updateAt?: number;
+}
+
 interface GetAllOrders {
   items: OrderEntity[];
   cursor?:
@@ -87,6 +99,8 @@ interface GetAllOrders {
     | undefined;
 }
 
+type FileType = Parameters<GetProp<UploadProps, "beforeUpload">>[0];
+
 const httpClient = new HttpService();
 
 function App() {
@@ -94,10 +108,12 @@ function App() {
 
   const [itemForm] = Form.useForm<ItemEntity>();
   const [collectForm] = Form.useForm<CollectEntity>();
+  const [deliveryForm] = Form.useForm<DeliveryEntity>();
 
   const [orders, setOrders] = useState<OrderEntity[]>([]);
   const [items, setItems] = useState<ItemEntity[]>([]);
   const [collects, setCollects] = useState<CollectEntity[]>([]);
+  const [deliveries, setDeliveries] = useState<CollectEntity[]>([]);
 
   const [searchedItem, setSearchedItem] = useState<ItemEntity>();
 
@@ -105,6 +121,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [imageUrl, setImageUrl] = useState<string>();
+  const [activeItem, setActiveItem] = useState<string>("");
 
   const { Search: SearchText } = Input;
 
@@ -151,37 +168,52 @@ function App() {
     setOpen(false);
   };
 
-  const onChangeItemCollapse = async (
-    key: string | string[],
-    orderId: string,
-  ) => {
-    const [entity] = key;
-    if (entity === ENTITIES.ITEM) {
-      const itemResult = await httpClient.getEntitiesByOrder<ItemEntity>(
-        entity,
-        orderId,
-        messageApi,
-      );
+  const onChangeItemCollapse = async (key: string | string[]) => {
+    const [orderId] = key;
 
-      if (itemResult?.items) {
-        setItems(itemResult.items);
-      }
+    if (!orderId) {
+      setActiveItem("");
+      return;
+    }
+
+    setActiveItem(orderId);
+
+    const itemResult = await httpClient.getItemsByOrder<ItemEntity>(
+      orderId,
+      messageApi,
+    );
+
+    if (itemResult?.items) {
+      setItems(itemResult.items);
     }
   };
 
-  const onChangeCollectCollapse = async (
+  const onChangeDriverCollapse = async (
     key: string | string[],
     itemId: string,
   ) => {
     const [entity] = key;
-    if (entity === ENTITIES.COLLECT) {
-      const collectsResult = await httpClient.getCollectsByItem<CollectEntity>(
-        itemId,
-        messageApi,
-      );
 
-      if (collectsResult?.items) {
-        setCollects(collectsResult.items);
+    if (entity) {
+      if (entity === ENTITIES.COLLECT) {
+        const collectsResult =
+          await httpClient.getCollectsByItem<CollectEntity>(itemId, messageApi);
+
+        if (collectsResult?.items) {
+          setCollects(collectsResult.items);
+        }
+      }
+
+      if (entity === ENTITIES.DELIVERY) {
+        const deliveryResult =
+          await httpClient.getDeliveriesByItem<DeliveryEntity>(
+            itemId,
+            messageApi,
+          );
+
+        if (deliveryResult?.items) {
+          setDeliveries(deliveryResult.items);
+        }
       }
     }
   };
@@ -199,8 +231,9 @@ function App() {
     setSearchedItem(searchResult);
   };
 
-  const onCollectCreated = async (collect: CollectEntity, itemId: string) => {
+  const onCreateCollect = async (collect: CollectEntity, itemId: string) => {
     const { driver, truck, quantity } = collect;
+
     const collectCreated = await httpClient.createEntity<CollectEntity>(
       ENTITIES.COLLECT,
       messageApi,
@@ -224,7 +257,32 @@ function App() {
     setOpen(false);
   };
 
-  type FileType = Parameters<GetProp<UploadProps, "beforeUpload">>[0];
+  const onCreateDelivery = async (delivery: DeliveryEntity, itemId: string) => {
+    const { customer, driver, truck, quantity } = delivery;
+
+    const deliveryCreated = await httpClient.createEntity<DeliveryEntity>(
+      ENTITIES.DELIVERY,
+      messageApi,
+      {
+        voucherId: itemId,
+        customer,
+        driver,
+        truck,
+        quantity,
+      },
+    );
+
+    if (deliveryCreated) {
+      messageApi.success({
+        type: "success",
+        content: "Entrega creada exitosamente",
+      });
+
+      setDeliveries((prevItems) => [...prevItems, { ...deliveryCreated }]);
+    }
+
+    setOpen(false);
+  };
 
   const beforeUpload = (file: FileType) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
@@ -245,7 +303,6 @@ function App() {
   };
 
   const handleChange: UploadProps["onChange"] = (info) => {
-    console.log({ info });
     if (info.file.status === "uploading") {
       setIsLoading(true);
       return;
@@ -291,7 +348,6 @@ function App() {
           }
           message.success(`${file.name} uploaded successfully!`);
         } catch (error) {
-          console.error("Upload error:", error);
           if (onError) {
             // onError({});
           }
@@ -317,14 +373,12 @@ function App() {
           <Header style={headerStyle}>
             <Flex justify="center" align="center" style={{ height: "100%" }}>
               <Image src={logo} height={"inherit"}></Image>
-              {/* <Title level={4} style={{ margin: 0 }}>
-                CONTROL DE ORDENES Y ENTREGAS
-              </Title> */}
             </Flex>
           </Header>
           <Content style={contentStyle}>
             {isAdmin ? (
               <>
+                {/* PANTALLA ADMINISTRADORES */}
                 <Flex
                   align="start"
                   justify={"center"}
@@ -357,7 +411,11 @@ function App() {
                 >
                   {orders.length ? (
                     orders.map((order) => (
-                      <Card title={order.id} id={order.id} key={order.id}>
+                      <Card
+                        title={`ORDEN - ${order.createdAt.toString(36).toUpperCase()}`}
+                        id={order.id}
+                        key={order.id}
+                      >
                         <Flex gap={"middle"} vertical>
                           <Flex justify={"space-between"}>
                             <Flex gap={"middle"}>
@@ -373,9 +431,11 @@ function App() {
                           </Flex>
                           <Collapse
                             accordion
+                            key={`${order.id}`}
+                            activeKey={activeItem}
                             items={[
                               {
-                                key: "item",
+                                key: `${order.id}`,
                                 label: "Pedidos",
                                 children: (
                                   <Flex gap="middle" vertical>
@@ -385,12 +445,15 @@ function App() {
                                         width: "100%",
                                         marginBottom: 10,
                                       }}
-                                      onClick={() => setOpen(true)}
+                                      onClick={() => {
+                                        setOpen(true);
+                                      }}
                                     >
                                       AGREGAR
                                     </Button>
                                     <Modal
                                       open={open}
+                                      destroyOnHidden
                                       title="Crear pedido"
                                       okText="Crear"
                                       cancelText="Cancelar"
@@ -399,21 +462,20 @@ function App() {
                                         htmlType: "submit",
                                       }}
                                       onCancel={() => setOpen(false)}
-                                      destroyOnHidden
                                       modalRender={(dom) => (
                                         <Form
                                           autoComplete="off"
                                           layout="vertical"
                                           form={itemForm}
-                                          name="item_form"
+                                          name={`item_form_order_${order.id}`}
                                           initialValues={{ modifier: "public" }}
                                           clearOnDestroy
                                           onFinish={(values) => {
-                                            console.log({ values });
                                             onCreateItem({
                                               ...values,
-                                              orderId: order.id,
+                                              orderId: activeItem,
                                             });
+                                            itemForm.resetFields();
                                           }}
                                         >
                                           {dom}
@@ -517,75 +579,85 @@ function App() {
                                       </Form.Item>
                                     </Modal>
 
-                                    {items.map((item) => (
+                                    {items.length > 0 && (
                                       <Collapse
                                         accordion
                                         size={"small"}
-                                        key={item.id}
-                                        items={[
-                                          {
-                                            key: item?.voucherId,
-                                            label: `Comprobante - ${item?.voucherId}`,
-                                            children: (
-                                              <Flex vertical gap="small">
-                                                <Flex gap={"middle"}>
-                                                  <Typography.Text>
-                                                    {formatTimeAgo(
-                                                      item.createdAt * 1000,
-                                                    )}
-                                                  </Typography.Text>
-                                                </Flex>
-                                                <Flex gap={"middle"}>
-                                                  <Typography.Text>
-                                                    Estado:
-                                                  </Typography.Text>
-                                                  <Tag
-                                                    key={"red"}
-                                                    color={"red"}
-                                                    variant="solid"
-                                                  >
-                                                    {item.status}
-                                                  </Tag>
-                                                </Flex>
-                                                <Flex gap="middle">
-                                                  <Typography.Text>
-                                                    Producto:
-                                                  </Typography.Text>
-                                                  <Typography.Text strong>
-                                                    {item.product}
-                                                  </Typography.Text>
-                                                </Flex>
-                                                <Flex>
-                                                  <Typography.Text>
-                                                    Cantidad:
-                                                  </Typography.Text>
-                                                </Flex>
+                                        key={"items"}
+                                        items={(() => {
+                                          return items.map((item) => {
+                                            return {
+                                              key: item.id,
+                                              label: `Comprobante - ${item?.voucherId}`,
+                                              children: (
                                                 <Flex
-                                                  justify="center"
-                                                  style={{ width: "100%" }}
+                                                  vertical
+                                                  gap="small"
+                                                  key={item.id}
+                                                  id={item.id}
                                                 >
-                                                  <Title
-                                                    level={2}
-                                                    style={{
-                                                      margin: 0,
-                                                      padding: 10,
-                                                    }}
+                                                  <Flex
+                                                    justify={"space-between"}
                                                   >
-                                                    {item.quantity}/0
-                                                  </Title>
+                                                    <Flex gap={"middle"}>
+                                                      <Typography.Text>
+                                                        Estado:
+                                                      </Typography.Text>
+                                                      <Tag
+                                                        key={"red"}
+                                                        color={"red"}
+                                                        variant="solid"
+                                                      >
+                                                        {order.status}
+                                                      </Tag>
+                                                    </Flex>
+
+                                                    <Typography.Text>
+                                                      {formatTimeAgo(
+                                                        order.createdAt * 1000,
+                                                      )}
+                                                    </Typography.Text>
+                                                  </Flex>
+                                                  <Flex gap="middle">
+                                                    <Typography.Text>
+                                                      Producto:
+                                                    </Typography.Text>
+                                                    <Typography.Text strong>
+                                                      {item.product}
+                                                    </Typography.Text>
+                                                  </Flex>
+                                                  <Flex>
+                                                    <Typography.Text>
+                                                      Cantidad:
+                                                    </Typography.Text>
+                                                  </Flex>
+                                                  <Flex
+                                                    justify="center"
+                                                    style={{ width: "100%" }}
+                                                  >
+                                                    <Title
+                                                      level={2}
+                                                      style={{
+                                                        margin: 0,
+                                                        padding: 10,
+                                                      }}
+                                                    >
+                                                      {item.quantity}/0
+                                                    </Title>
+                                                  </Flex>
                                                 </Flex>
-                                              </Flex>
-                                            ),
-                                          },
-                                        ]}
+                                              ),
+                                            };
+                                          });
+                                        })()}
                                       ></Collapse>
-                                    ))}
+                                    )}
                                   </Flex>
                                 ),
                               },
                             ]}
                             onChange={(key) => {
-                              onChangeItemCollapse(key, order.id);
+                              onChangeItemCollapse(key);
                             }}
                           />
                         </Flex>
@@ -598,15 +670,15 @@ function App() {
               </>
             ) : (
               <>
+                {/* PANTALLA DE PILOTOS */}
                 <Flex
                   align="center"
                   justify={"space-between"}
                   style={{ height: "10%", padding: "12px" }}
                 >
                   <SearchText
-                    allowClear
-                    placeholder="comprobante"
                     enterButton
+                    placeholder="COMPROBANTE"
                     loading={isLoading}
                     onSearch={onSearch}
                   />
@@ -620,7 +692,7 @@ function App() {
                     overflow: "scroll",
                     height: "90%",
                     padding: "8px",
-                    // background: "green",
+                    background: "black",
                   }}
                 >
                   {searchedItem ? (
@@ -681,7 +753,7 @@ function App() {
                                         initialValues={{ modifier: "public" }}
                                         clearOnDestroy
                                         onFinish={(values) => {
-                                          onCollectCreated(
+                                          onCreateCollect(
                                             values,
                                             searchedItem.id,
                                           );
@@ -736,83 +808,311 @@ function App() {
                                     </Form.Item>
                                   </Modal>
 
-                                  {collects.map((collect, index) => (
+                                  {collects.length > 0 && (
                                     <Collapse
-                                      // bordered={false}
                                       accordion
                                       size={"small"}
-                                      key={collect.id}
-                                      items={[
-                                        {
-                                          key: collect.voucherId,
-                                          label: `Recolecta - ${index + 1}`,
-                                          children: (
-                                            <Flex vertical gap="small">
-                                              <Flex gap={"middle"}>
-                                                <Typography.Text>
-                                                  {formatTimeAgo(
-                                                    collect.createdAt! * 1000,
-                                                  )}
-                                                </Typography.Text>
-                                              </Flex>
-                                              <Flex gap={"middle"}>
-                                                <Typography.Text>
-                                                  Piloto:
-                                                </Typography.Text>
-                                                <Tag
-                                                  key={"red"}
-                                                  color={"red"}
-                                                  variant="solid"
-                                                >
-                                                  {collect.driver}
-                                                </Tag>
-                                              </Flex>
-                                              <Flex gap="middle">
-                                                <Typography.Text>
-                                                  Camion:
-                                                </Typography.Text>
-                                                <Typography.Text strong>
-                                                  {collect.truck}
-                                                </Typography.Text>
-                                              </Flex>
-                                              <Flex>
-                                                <Typography.Text>
-                                                  Cantidad:
-                                                </Typography.Text>
-                                              </Flex>
+                                      key={"collects"}
+                                      items={(() => {
+                                        return collects.map((collect) => {
+                                          return {
+                                            key: collect.id,
+                                            label: `${collect.createdAt?.toString(36).toUpperCase()}`,
+                                            children: (
                                               <Flex
-                                                justify="center"
-                                                style={{ width: "100%" }}
+                                                vertical
+                                                gap="small"
+                                                key={collect.id}
+                                                id={collect.id}
                                               >
-                                                <Title
-                                                  level={2}
-                                                  style={{
-                                                    margin: 0,
-                                                    padding: 10,
-                                                  }}
+                                                <Flex justify={"space-between"}>
+                                                  <Flex gap={"middle"}>
+                                                    <Typography.Text>
+                                                      Piloto:
+                                                    </Typography.Text>
+                                                    <Tag
+                                                      key={"red"}
+                                                      color={"red"}
+                                                      variant="solid"
+                                                    >
+                                                      {collect.driver}
+                                                    </Tag>
+                                                  </Flex>
+
+                                                  <Typography.Text>
+                                                    {formatTimeAgo(
+                                                      collect.createdAt! * 1000,
+                                                    )}
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex gap="middle">
+                                                  <Typography.Text>
+                                                    Camion:
+                                                  </Typography.Text>
+                                                  <Typography.Text strong>
+                                                    {collect.truck}
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex>
+                                                  <Typography.Text>
+                                                    Cantidad:
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex
+                                                  justify="center"
+                                                  style={{ width: "100%" }}
                                                 >
-                                                  {collect.quantity}
-                                                </Title>
+                                                  <Title
+                                                    level={2}
+                                                    style={{
+                                                      margin: 0,
+                                                      padding: 10,
+                                                    }}
+                                                  >
+                                                    {collect.quantity}
+                                                  </Title>
+                                                </Flex>
                                               </Flex>
-                                            </Flex>
-                                          ),
-                                        },
-                                      ]}
+                                            ),
+                                          };
+                                        });
+                                      })()}
                                     ></Collapse>
-                                  ))}
+                                  )}
                                 </Flex>
                               ),
                             },
-                            { key: "deliveries", label: "Entregas" },
+                            {
+                              key: "delivery",
+                              label: "Entregas",
+                              children: (
+                                <Flex gap="middle" vertical>
+                                  <Button
+                                    type="primary"
+                                    style={{
+                                      width: "100%",
+                                      marginBottom: 10,
+                                    }}
+                                    onClick={() => setOpen(true)}
+                                  >
+                                    AGREGAR
+                                  </Button>
+                                  <Modal
+                                    open={open}
+                                    title="Crear Entrega"
+                                    okText="Crear"
+                                    cancelText="Cancelar"
+                                    okButtonProps={{
+                                      autoFocus: true,
+                                      htmlType: "submit",
+                                    }}
+                                    onCancel={() => setOpen(false)}
+                                    destroyOnHidden
+                                    modalRender={(dom) => (
+                                      <Form
+                                        autoComplete="off"
+                                        layout="vertical"
+                                        form={deliveryForm}
+                                        name="delivery_form"
+                                        initialValues={{ modifier: "public" }}
+                                        clearOnDestroy
+                                        onFinish={(values) => {
+                                          onCreateDelivery(
+                                            values,
+                                            searchedItem.id,
+                                          );
+                                        }}
+                                      >
+                                        {dom}
+                                      </Form>
+                                    )}
+                                  >
+                                    <Flex justify={"space-between"}>
+                                      <Form.Item
+                                        name="customer"
+                                        label="Cliente"
+                                        layout="vertical"
+                                        rules={[
+                                          {
+                                            required: true,
+                                            message: "Campo requerido",
+                                          },
+                                        ]}
+                                        style={{ width: "60%" }}
+                                      >
+                                        <Input name="customer"></Input>
+                                      </Form.Item>
+
+                                      <Form.Item name="voucherLink">
+                                        <Upload
+                                          maxCount={1}
+                                          multiple={false}
+                                          name="voucher"
+                                          listType={"picture-card"}
+                                          className="avatar-uploader"
+                                          beforeUpload={beforeUpload}
+                                          onChange={handleChange}
+                                          action={`${BASE_URL}/manager/image/upload`}
+                                          showUploadList={false}
+                                          customRequest={customRequest}
+                                        >
+                                          {imageUrl ? (
+                                            <img
+                                              draggable={false}
+                                              src={imageUrl}
+                                              alt="avatar"
+                                              style={{ width: "100%" }}
+                                            />
+                                          ) : (
+                                            <button
+                                              style={{
+                                                border: 0,
+                                                background: "none",
+                                              }}
+                                              type="button"
+                                            >
+                                              {isLoading ? (
+                                                <LoadingOutlined />
+                                              ) : (
+                                                <PlusOutlined />
+                                              )}
+                                              <div style={{ marginTop: 8 }}>
+                                                Subir
+                                              </div>
+                                            </button>
+                                          )}
+                                        </Upload>
+                                      </Form.Item>
+                                    </Flex>
+
+                                    <Form.Item
+                                      name="driver"
+                                      label="Piloto"
+                                      layout="vertical"
+                                      rules={[
+                                        {
+                                          required: true,
+                                          message: "Campo requerido",
+                                        },
+                                      ]}
+                                    >
+                                      <Input name="driver"></Input>
+                                    </Form.Item>
+
+                                    <Form.Item
+                                      name="truck"
+                                      label="Camion"
+                                      layout="vertical"
+                                      rules={[
+                                        {
+                                          required: true,
+                                          message: "Campo requerido",
+                                        },
+                                      ]}
+                                    >
+                                      <Input name="truck"></Input>
+                                    </Form.Item>
+
+                                    <Form.Item
+                                      name="quantity"
+                                      label="Cantidad"
+                                      rules={[
+                                        {
+                                          required: true,
+                                          message: "Campo requerido",
+                                        },
+                                      ]}
+                                    >
+                                      <InputNumber
+                                        type="number"
+                                        style={{ width: "100%" }}
+                                      />
+                                    </Form.Item>
+                                  </Modal>
+
+                                  {deliveries.length > 0 && (
+                                    <Collapse
+                                      accordion
+                                      size={"small"}
+                                      key={"deliveries"}
+                                      items={(() => {
+                                        return deliveries.map((collect) => {
+                                          return {
+                                            key: collect.id,
+                                            label: `${collect.createdAt?.toString(36).toUpperCase()}`,
+                                            children: (
+                                              <Flex
+                                                vertical
+                                                gap="small"
+                                                key={collect.id}
+                                                id={collect.id}
+                                              >
+                                                <Flex justify={"space-between"}>
+                                                  <Flex gap={"middle"}>
+                                                    <Typography.Text>
+                                                      Piloto:
+                                                    </Typography.Text>
+                                                    <Tag
+                                                      key={"red"}
+                                                      color={"red"}
+                                                      variant="solid"
+                                                    >
+                                                      {collect.driver}
+                                                    </Tag>
+                                                  </Flex>
+
+                                                  <Typography.Text>
+                                                    {formatTimeAgo(
+                                                      collect.createdAt! * 1000,
+                                                    )}
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex gap="middle">
+                                                  <Typography.Text>
+                                                    Camion:
+                                                  </Typography.Text>
+                                                  <Typography.Text strong>
+                                                    {collect.truck}
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex>
+                                                  <Typography.Text>
+                                                    Cantidad:
+                                                  </Typography.Text>
+                                                </Flex>
+                                                <Flex
+                                                  justify="center"
+                                                  style={{ width: "100%" }}
+                                                >
+                                                  <Title
+                                                    level={2}
+                                                    style={{
+                                                      margin: 0,
+                                                      padding: 10,
+                                                    }}
+                                                  >
+                                                    {collect.quantity}
+                                                  </Title>
+                                                </Flex>
+                                              </Flex>
+                                            ),
+                                          };
+                                        });
+                                      })()}
+                                    ></Collapse>
+                                  )}
+                                </Flex>
+                              ),
+                            },
                           ]}
                           onChange={(key) => {
-                            onChangeCollectCollapse(key, searchedItem.id);
+                            onChangeDriverCollapse(key, searchedItem.id);
                           }}
                         />
                       </Flex>
                     </Card>
                   ) : (
-                    <></>
+                    <Flex></Flex>
                   )}
                 </Flex>
               </>
