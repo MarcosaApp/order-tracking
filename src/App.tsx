@@ -24,8 +24,12 @@ import { Content, Header } from "antd/es/layout/layout";
 import Title from "antd/es/typography/Title";
 import { useEffect, useState } from "react";
 import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
   LoadingOutlined,
   PlusOutlined,
+  SyncOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import { BASE_URL, HttpService } from "./services/http.service";
@@ -33,6 +37,12 @@ import { formatTimeAgo } from "./utils/date.utils";
 import { ENTITIES } from "./enums";
 import Search from "antd/es/input/Search";
 import logo from "./assets/logo.jpeg";
+import type {
+  CollectEntity,
+  DeliveryEntity,
+  ItemEntity,
+  OrderEntity,
+} from "./interfaces/entities";
 
 const layoutStyle = {
   // backgroundColor: "black",
@@ -48,47 +58,6 @@ const contentStyle: React.CSSProperties = {
   textAlign: "center",
   height: "90vh",
 };
-
-interface OrderEntity {
-  id: string;
-  status?: string | undefined;
-  createdAt: number;
-  updateAt: number;
-}
-
-interface ItemEntity {
-  id: string;
-  voucherId: string;
-  orderId: string;
-  product: string;
-  quantity: number;
-  voucherLink?: string;
-  status?: string;
-  createdAt: number;
-  updateAt: number;
-}
-
-interface CollectEntity {
-  id?: string;
-  voucherId: string;
-  driver: string;
-  truck: string;
-  quantity: number;
-  createdAt?: number;
-  updateAt?: number;
-}
-
-interface DeliveryEntity {
-  id?: string;
-  voucherId: string;
-  driver: string;
-  truck: string;
-  quantity: number;
-  customer: string;
-  voucherLink?: string;
-  createdAt?: number;
-  updateAt?: number;
-}
 
 interface GetAllOrders {
   items: OrderEntity[];
@@ -117,11 +86,16 @@ function App() {
 
   const [searchedItem, setSearchedItem] = useState<ItemEntity>();
 
-  const [open, setOpen] = useState(false);
+  const [openItemModal, setOpenItemModal] = useState(false);
+  const [openCollectModal, setOpenCollectModal] = useState(false);
+  const [openDeliveryModal, setOpenDeliveryModal] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
 
   const [imageUrl, setImageUrl] = useState<string>();
   const [activeItem, setActiveItem] = useState<string>("");
+
+  const [isAdmin, setIsAdmin] = useState(true);
 
   const { Search: SearchText } = Input;
 
@@ -165,7 +139,7 @@ function App() {
       }
     }
 
-    setOpen(false);
+    setOpenItemModal(false);
   };
 
   const onChangeItemCollapse = async (key: string | string[]) => {
@@ -231,30 +205,32 @@ function App() {
     setSearchedItem(searchResult);
   };
 
-  const onCreateCollect = async (collect: CollectEntity, itemId: string) => {
+  const onCreateCollect = async (collect: CollectEntity, voucherId: string) => {
     const { driver, truck, quantity } = collect;
 
-    const collectCreated = await httpClient.createEntity<CollectEntity>(
-      ENTITIES.COLLECT,
-      messageApi,
-      {
-        voucherId: itemId,
-        driver,
-        truck,
-        quantity,
-      },
-    );
+    const collectCreated = await httpClient.createCollect(messageApi, {
+      voucherId,
+      driver,
+      truck,
+      quantity,
+    });
 
     if (collectCreated) {
-      messageApi.success({
-        type: "success",
-        content: "Recolecta creada exitosamente",
-      });
+      if (collectCreated.item && collectCreated.collect) {
+        messageApi.success({
+          type: "success",
+          content: "Recolecta creada exitosamente",
+        });
 
-      setCollects((prevItems) => [...prevItems, { ...collectCreated }]);
+        setSearchedItem(collectCreated.item);
+        setCollects((prevItems) => [
+          ...prevItems,
+          { ...collectCreated.collect },
+        ]);
+      }
     }
 
-    setOpen(false);
+    setOpenCollectModal(false);
   };
 
   const onCreateDelivery = async (delivery: DeliveryEntity, itemId: string) => {
@@ -281,7 +257,7 @@ function App() {
       setDeliveries((prevItems) => [...prevItems, { ...deliveryCreated }]);
     }
 
-    setOpen(false);
+    setOpenDeliveryModal(false);
   };
 
   const beforeUpload = (file: FileType) => {
@@ -362,8 +338,6 @@ function App() {
     }
   };
 
-  const isAdmin = true;
-
   return (
     <Row>
       <Col xl={8} md={6} xs={24} style={{ background: "#8c8c8c" }}></Col>
@@ -373,6 +347,14 @@ function App() {
           <Header style={headerStyle}>
             <Flex justify="center" align="center" style={{ height: "100%" }}>
               <Image src={logo} height={"inherit"}></Image>
+              <Button
+                type={"primary"}
+                onClick={() => {
+                  setIsAdmin(!isAdmin);
+                }}
+              >
+                CAMBIAR ROL
+              </Button>
             </Flex>
           </Header>
           <Content style={contentStyle}>
@@ -420,9 +402,38 @@ function App() {
                           <Flex justify={"space-between"}>
                             <Flex gap={"middle"}>
                               <Typography.Text>Estado:</Typography.Text>
-                              <Tag key={"red"} color={"red"} variant="solid">
-                                {order.status}
-                              </Tag>
+                              {order.status === "PENDIENTE" && (
+                                <Tag
+                                  key={"error"}
+                                  color={"error"}
+                                  icon={<CloseCircleOutlined />}
+                                  variant="solid"
+                                >
+                                  {order.status}
+                                </Tag>
+                              )}
+
+                              {order.status === "EN RUTA" && (
+                                <Tag
+                                  key={"processing"}
+                                  color={"processing"}
+                                  icon={<SyncOutlined />}
+                                  variant="solid"
+                                >
+                                  {order.status}
+                                </Tag>
+                              )}
+
+                              {order.status === "RECOLECTADO" && (
+                                <Tag
+                                  key={"success"}
+                                  color={"success"}
+                                  icon={<CheckCircleOutlined />}
+                                  variant="solid"
+                                >
+                                  {order.status}
+                                </Tag>
+                              )}
                             </Flex>
 
                             <Typography.Text>
@@ -446,13 +457,13 @@ function App() {
                                         marginBottom: 10,
                                       }}
                                       onClick={() => {
-                                        setOpen(true);
+                                        setOpenItemModal(true);
                                       }}
                                     >
                                       AGREGAR
                                     </Button>
                                     <Modal
-                                      open={open}
+                                      open={openItemModal}
                                       destroyOnHidden
                                       title="Crear pedido"
                                       okText="Crear"
@@ -461,7 +472,7 @@ function App() {
                                         autoFocus: true,
                                         htmlType: "submit",
                                       }}
-                                      onCancel={() => setOpen(false)}
+                                      onCancel={() => setOpenItemModal(false)}
                                       modalRender={(dom) => (
                                         <Form
                                           autoComplete="off"
@@ -475,7 +486,6 @@ function App() {
                                               ...values,
                                               orderId: activeItem,
                                             });
-                                            itemForm.resetFields();
                                           }}
                                         >
                                           {dom}
@@ -569,10 +579,33 @@ function App() {
                                       >
                                         <Select
                                           options={[
-                                            { value: "Block", label: "Block" },
                                             {
-                                              value: "Cemento",
-                                              label: "Cemento",
+                                              value: "Monocapa Gris",
+                                              label: "Monocapa Gris",
+                                            },
+                                            {
+                                              value: "Monocapa Blanco",
+                                              label: "Monocapa Blanco",
+                                            },
+                                            {
+                                              value: "Horcalsa",
+                                              label: "Horcalsa",
+                                            },
+                                            {
+                                              value: "Montaña",
+                                              label: "Montaña",
+                                            },
+                                            {
+                                              value: "Cemento Ariblock",
+                                              label: "Cemento Ariblock",
+                                            },
+                                            {
+                                              value: "Monocapa Extraliso",
+                                              label: "Monocapa Extraliso",
+                                            },
+                                            {
+                                              value: "Monocapa Ultraliso",
+                                              label: "Monocapa Ultraliso",
                                             },
                                           ]}
                                         ></Select>
@@ -603,18 +636,52 @@ function App() {
                                                       <Typography.Text>
                                                         Estado:
                                                       </Typography.Text>
-                                                      <Tag
-                                                        key={"red"}
-                                                        color={"red"}
-                                                        variant="solid"
-                                                      >
-                                                        {order.status}
-                                                      </Tag>
+                                                      {item.status ===
+                                                        "PENDIENTE" && (
+                                                        <Tag
+                                                          key={"error"}
+                                                          color={"error"}
+                                                          icon={
+                                                            <CloseCircleOutlined />
+                                                          }
+                                                          variant="solid"
+                                                        >
+                                                          {item.status}
+                                                        </Tag>
+                                                      )}
+
+                                                      {item.status ===
+                                                        "EN RUTA" && (
+                                                        <Tag
+                                                          key={"processing"}
+                                                          color={"processing"}
+                                                          icon={
+                                                            <SyncOutlined />
+                                                          }
+                                                          variant="solid"
+                                                        >
+                                                          {item.status}
+                                                        </Tag>
+                                                      )}
+
+                                                      {item.status ===
+                                                        "RECOLECTADO" && (
+                                                        <Tag
+                                                          key={"success"}
+                                                          color={"success"}
+                                                          icon={
+                                                            <CheckCircleOutlined />
+                                                          }
+                                                          variant="solid"
+                                                        >
+                                                          {item.status}
+                                                        </Tag>
+                                                      )}
                                                     </Flex>
 
                                                     <Typography.Text>
                                                       {formatTimeAgo(
-                                                        order.createdAt * 1000,
+                                                        item.createdAt * 1000,
                                                       )}
                                                     </Typography.Text>
                                                   </Flex>
@@ -642,7 +709,8 @@ function App() {
                                                         padding: 10,
                                                       }}
                                                     >
-                                                      {item.quantity}/0
+                                                      {item.quantity}/
+                                                      {item.collected}
                                                     </Title>
                                                   </Flex>
                                                 </Flex>
@@ -678,7 +746,7 @@ function App() {
                 >
                   <SearchText
                     enterButton
-                    placeholder="COMPROBANTE"
+                    // placeholder="comprobante"
                     loading={isLoading}
                     onSearch={onSearch}
                   />
@@ -705,9 +773,38 @@ function App() {
                         <Flex justify={"space-between"}>
                           <Flex gap={"middle"}>
                             <Typography.Text>Estado:</Typography.Text>
-                            <Tag key={"red"} color={"red"} variant="solid">
-                              {searchedItem.status}
-                            </Tag>
+                            {searchedItem.status === "PENDIENTE" && (
+                              <Tag
+                                key={"error"}
+                                color={"error"}
+                                icon={<CloseCircleOutlined />}
+                                variant="solid"
+                              >
+                                {searchedItem.status}
+                              </Tag>
+                            )}
+
+                            {searchedItem.status === "EN RUTA" && (
+                              <Tag
+                                key={"processing"}
+                                color={"processing"}
+                                icon={<SyncOutlined />}
+                                variant="solid"
+                              >
+                                {searchedItem.status}
+                              </Tag>
+                            )}
+
+                            {searchedItem.status === "RECOLECTADO" && (
+                              <Tag
+                                key={"success"}
+                                color={"success"}
+                                icon={<CheckCircleOutlined />}
+                                variant="solid"
+                              >
+                                {searchedItem.status}
+                              </Tag>
+                            )}
                           </Flex>
 
                           <Typography.Text>
@@ -729,12 +826,12 @@ function App() {
                                       width: "100%",
                                       marginBottom: 10,
                                     }}
-                                    onClick={() => setOpen(true)}
+                                    onClick={() => setOpenCollectModal(true)}
                                   >
                                     AGREGAR
                                   </Button>
                                   <Modal
-                                    open={open}
+                                    open={openCollectModal}
                                     title="Crear recolecta"
                                     okText="Crear"
                                     cancelText="Cancelar"
@@ -742,7 +839,7 @@ function App() {
                                       autoFocus: true,
                                       htmlType: "submit",
                                     }}
-                                    onCancel={() => setOpen(false)}
+                                    onCancel={() => setOpenCollectModal(false)}
                                     destroyOnHidden
                                     modalRender={(dom) => (
                                       <Form
@@ -755,7 +852,7 @@ function App() {
                                         onFinish={(values) => {
                                           onCreateCollect(
                                             values,
-                                            searchedItem.id,
+                                            searchedItem.voucherId,
                                           );
                                         }}
                                       >
@@ -893,12 +990,12 @@ function App() {
                                       width: "100%",
                                       marginBottom: 10,
                                     }}
-                                    onClick={() => setOpen(true)}
+                                    onClick={() => setOpenDeliveryModal(true)}
                                   >
                                     AGREGAR
                                   </Button>
                                   <Modal
-                                    open={open}
+                                    open={openDeliveryModal}
                                     title="Crear Entrega"
                                     okText="Crear"
                                     cancelText="Cancelar"
@@ -906,7 +1003,7 @@ function App() {
                                       autoFocus: true,
                                       htmlType: "submit",
                                     }}
-                                    onCancel={() => setOpen(false)}
+                                    onCancel={() => setOpenDeliveryModal(false)}
                                     destroyOnHidden
                                     modalRender={(dom) => (
                                       <Form
@@ -919,7 +1016,7 @@ function App() {
                                         onFinish={(values) => {
                                           onCreateDelivery(
                                             values,
-                                            searchedItem.id,
+                                            searchedItem.voucherId,
                                           );
                                         }}
                                       >
@@ -927,63 +1024,20 @@ function App() {
                                       </Form>
                                     )}
                                   >
-                                    <Flex justify={"space-between"}>
-                                      <Form.Item
-                                        name="customer"
-                                        label="Cliente"
-                                        layout="vertical"
-                                        rules={[
-                                          {
-                                            required: true,
-                                            message: "Campo requerido",
-                                          },
-                                        ]}
-                                        style={{ width: "60%" }}
-                                      >
-                                        <Input name="customer"></Input>
-                                      </Form.Item>
-
-                                      <Form.Item name="voucherLink">
-                                        <Upload
-                                          maxCount={1}
-                                          multiple={false}
-                                          name="voucher"
-                                          listType={"picture-card"}
-                                          className="avatar-uploader"
-                                          beforeUpload={beforeUpload}
-                                          onChange={handleChange}
-                                          action={`${BASE_URL}/manager/image/upload`}
-                                          showUploadList={false}
-                                          customRequest={customRequest}
-                                        >
-                                          {imageUrl ? (
-                                            <img
-                                              draggable={false}
-                                              src={imageUrl}
-                                              alt="avatar"
-                                              style={{ width: "100%" }}
-                                            />
-                                          ) : (
-                                            <button
-                                              style={{
-                                                border: 0,
-                                                background: "none",
-                                              }}
-                                              type="button"
-                                            >
-                                              {isLoading ? (
-                                                <LoadingOutlined />
-                                              ) : (
-                                                <PlusOutlined />
-                                              )}
-                                              <div style={{ marginTop: 8 }}>
-                                                Subir
-                                              </div>
-                                            </button>
-                                          )}
-                                        </Upload>
-                                      </Form.Item>
-                                    </Flex>
+                                    <Form.Item
+                                      name="customer"
+                                      label="Cliente"
+                                      layout="vertical"
+                                      rules={[
+                                        {
+                                          required: true,
+                                          message: "Campo requerido",
+                                        },
+                                      ]}
+                                      style={{ width: "100%" }}
+                                    >
+                                      <Input name="customer"></Input>
+                                    </Form.Item>
 
                                     <Form.Item
                                       name="driver"
@@ -1106,7 +1160,7 @@ function App() {
                             },
                           ]}
                           onChange={(key) => {
-                            onChangeDriverCollapse(key, searchedItem.id);
+                            onChangeDriverCollapse(key, searchedItem.voucherId);
                           }}
                         />
                       </Flex>

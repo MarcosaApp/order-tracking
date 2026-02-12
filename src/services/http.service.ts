@@ -1,5 +1,6 @@
 import type { MessageInstance } from "antd/es/message/interface";
 import { ENTITIES } from "../enums";
+import type { CollectEntity, ItemEntity } from "../interfaces/entities";
 
 export const BASE_URL = "http://localhost:8081/api/v1";
 
@@ -7,6 +8,16 @@ interface TResponse<T> {
   error: boolean;
   data: T;
   message?: string;
+}
+
+interface CollectData {
+  collect: CollectEntity;
+  item: ItemEntity;
+}
+
+interface TResponseCollect {
+  error: boolean;
+  data: CollectData;
 }
 
 interface QueryResponse<T> {
@@ -196,6 +207,39 @@ export class HttpService {
 
       if (response.error) {
         throw new Error(`Error creando la entidad: ${entity}`);
+      }
+
+      return response.data;
+    } catch (error) {
+      if (error instanceof Error) {
+        messageApi.error({
+          type: "error",
+          content: error.message,
+        });
+      }
+
+      return;
+    }
+  }
+
+  async createCollect(
+    messageApi: MessageInstance,
+    body: CollectEntity,
+  ): Promise<CollectData | undefined> {
+    try {
+      const request = await fetch(`${BASE_URL}/collect`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+
+      if (!request.ok) {
+        throw new Error("Error enviando la peticion al servidor");
+      }
+
+      const response = (await request.json()) as TResponseCollect;
+
+      if (response.error) {
+        throw new Error("Error creando la recolecta");
       }
 
       return response.data;
