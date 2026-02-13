@@ -27,6 +27,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   CloseCircleOutlined,
+  DownloadOutlined,
   LoadingOutlined,
   PlusOutlined,
   SyncOutlined,
@@ -43,6 +44,8 @@ import type {
   ItemEntity,
   OrderEntity,
 } from "./interfaces/entities";
+import jsPDF from "jspdf";
+import { logoUrl } from "./logo";
 
 const layoutStyle = {
   // backgroundColor: "black",
@@ -82,7 +85,7 @@ function App() {
   const [orders, setOrders] = useState<OrderEntity[]>([]);
   const [items, setItems] = useState<ItemEntity[]>([]);
   const [collects, setCollects] = useState<CollectEntity[]>([]);
-  const [deliveries, setDeliveries] = useState<CollectEntity[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryEntity[]>([]);
 
   const [searchedItem, setSearchedItem] = useState<ItemEntity>();
 
@@ -400,7 +403,7 @@ function App() {
                       >
                         <Flex gap={"middle"} vertical>
                           <Flex justify={"space-between"}>
-                            <Flex gap={"middle"}>
+                            {/* <Flex gap={"middle"}>
                               <Typography.Text>Estado:</Typography.Text>
                               {order.status === "PENDIENTE" && (
                                 <Tag
@@ -434,7 +437,7 @@ function App() {
                                   {order.status}
                                 </Tag>
                               )}
-                            </Flex>
+                            </Flex> */}
 
                             <Typography.Text>
                               {formatTimeAgo(order.createdAt * 1000)}
@@ -1090,16 +1093,16 @@ function App() {
                                       size={"small"}
                                       key={"deliveries"}
                                       items={(() => {
-                                        return deliveries.map((collect) => {
+                                        return deliveries.map((delivery) => {
                                           return {
-                                            key: collect.id,
-                                            label: `${collect.createdAt?.toString(36).toUpperCase()}`,
+                                            key: delivery.id,
+                                            label: `${delivery.createdAt?.toString(36).toUpperCase()}`,
                                             children: (
                                               <Flex
                                                 vertical
                                                 gap="small"
-                                                key={collect.id}
-                                                id={collect.id}
+                                                key={delivery.id}
+                                                id={delivery.id}
                                               >
                                                 <Flex justify={"space-between"}>
                                                   <Flex gap={"middle"}>
@@ -1111,13 +1114,14 @@ function App() {
                                                       color={"red"}
                                                       variant="solid"
                                                     >
-                                                      {collect.driver}
+                                                      {delivery.driver}
                                                     </Tag>
                                                   </Flex>
 
                                                   <Typography.Text>
                                                     {formatTimeAgo(
-                                                      collect.createdAt! * 1000,
+                                                      delivery.createdAt! *
+                                                        1000,
                                                     )}
                                                   </Typography.Text>
                                                 </Flex>
@@ -1126,7 +1130,7 @@ function App() {
                                                     Camion:
                                                   </Typography.Text>
                                                   <Typography.Text strong>
-                                                    {collect.truck}
+                                                    {delivery.truck}
                                                   </Typography.Text>
                                                 </Flex>
                                                 <Flex>
@@ -1145,9 +1149,147 @@ function App() {
                                                       padding: 10,
                                                     }}
                                                   >
-                                                    {collect.quantity}
+                                                    {delivery.quantity}
                                                   </Title>
                                                 </Flex>
+                                                <Button
+                                                  type={"dashed"}
+                                                  icon={<DownloadOutlined />}
+                                                  onClick={async () => {
+                                                    const doc = new jsPDF({
+                                                      orientation: "landscape",
+                                                      format: [150, 125],
+                                                      compress: true,
+                                                    });
+
+                                                    const pageWidth =
+                                                      doc.internal.pageSize.getWidth();
+                                                    const x = pageWidth / 2;
+
+                                                    doc.setFontSize(15);
+
+                                                    doc.addImage(
+                                                      logoUrl,
+                                                      "JPEG",
+                                                      5,
+                                                      2,
+                                                      80,
+                                                      35,
+                                                    );
+
+                                                    doc.setFont(
+                                                      "Helvetica",
+                                                      "normal",
+                                                      "bold",
+                                                    );
+
+                                                    doc.text(
+                                                      `# ${delivery.createdAt?.toString(36).toUpperCase()}`,
+                                                      pageWidth - 10,
+                                                      23,
+                                                      { align: "right" },
+                                                    );
+
+                                                    doc.setFontSize(12);
+
+                                                    doc.setFont(
+                                                      "courier",
+                                                      "italic",
+                                                    );
+
+                                                    doc.text(
+                                                      `${new Date(delivery.createdAt! * 1000).toLocaleString()}`,
+                                                      pageWidth - 10,
+                                                      50,
+                                                      { align: "right" },
+                                                    );
+
+                                                    doc.setFontSize(13);
+                                                    doc.setFont(
+                                                      "courier",
+                                                      "normal",
+                                                    );
+
+                                                    doc.text(
+                                                      "Cliente:",
+                                                      10,
+                                                      70,
+                                                      { align: "left" },
+                                                    );
+
+                                                    doc.text(
+                                                      `${delivery.customer}`,
+                                                      pageWidth - 10,
+                                                      70,
+                                                      { align: "right" },
+                                                    );
+
+                                                    doc.text(
+                                                      "Entregado por:",
+                                                      10,
+                                                      80,
+                                                      { align: "left" },
+                                                    );
+
+                                                    doc.text(
+                                                      delivery.driver,
+                                                      pageWidth - 10,
+                                                      80,
+                                                      { align: "right" },
+                                                    );
+
+                                                    doc.text(
+                                                      "Camion:",
+                                                      10,
+                                                      90,
+                                                      { align: "left" },
+                                                    );
+
+                                                    doc.text(
+                                                      delivery.truck,
+                                                      pageWidth - 10,
+                                                      90,
+                                                      { align: "right" },
+                                                    );
+
+                                                    doc.text(
+                                                      "Producto:",
+                                                      10,
+                                                      100,
+                                                      { align: "left" },
+                                                    );
+
+                                                    doc.text(
+                                                      `${searchedItem.product}`,
+                                                      pageWidth - 10,
+                                                      100,
+                                                      { align: "right" },
+                                                    );
+
+                                                    doc.text(
+                                                      "Cantidad:",
+                                                      10,
+                                                      110,
+                                                      { align: "left" },
+                                                    );
+
+                                                    doc.text(
+                                                      `${delivery.quantity}`,
+                                                      pageWidth - 10,
+                                                      110,
+                                                      { align: "right" },
+                                                    );
+
+                                                    const randomDocId =
+                                                      Date.now().toString(36);
+
+                                                    doc.save(
+                                                      `pedido-${delivery.voucherId}-${randomDocId.slice(4, randomDocId.length)}.pdf`,
+                                                    );
+                                                  }}
+                                                >
+                                                  Voucher
+                                                </Button>
                                               </Flex>
                                             ),
                                           };
