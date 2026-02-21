@@ -16,6 +16,8 @@ import {
   Collapse,
   Upload,
   Image,
+  ConfigProvider,
+  theme,
   type GetProp,
   type UploadProps,
 } from "antd";
@@ -452,16 +454,41 @@ function App() {
 
   // Show login page if not authenticated
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return (
+      <ConfigProvider
+        theme={{
+          algorithm: theme.defaultAlgorithm,
+          token: {
+            colorPrimary: "#1890ff", // Daybreak Blue
+            colorInfo: "#1890ff",
+            colorLink: "#1890ff",
+            borderRadius: 6,
+          },
+        }}
+      >
+        <Login onLogin={handleLogin} />
+      </ConfigProvider>
+    );
   }
 
   return (
-    <Row>
-      <Col xl={8} md={6} xs={24} style={{ background: "#8c8c8c" }}></Col>
-      <Col xl={8} md={12} xs={24}>
-        <Layout style={layoutStyle}>
-          <>{contextHolder}</>
-          <Header style={headerStyle}>
+    <ConfigProvider
+      theme={{
+        algorithm: theme.defaultAlgorithm,
+        token: {
+          colorPrimary: "#1890ff", // Daybreak Blue
+          colorInfo: "#1890ff",
+          colorLink: "#1890ff",
+          borderRadius: 6,
+        },
+      }}
+    >
+      <Row>
+        <Col xl={8} md={6} xs={24} style={{ background: "#8c8c8c" }}></Col>
+        <Col xl={8} md={12} xs={24}>
+          <Layout style={layoutStyle}>
+            <>{contextHolder}</>
+            <Header style={headerStyle}>
             <Flex justify="space-between" align="center" style={{ height: "100%", padding: "0 20px" }}>
               <Image src={logo} height={"inherit"} preview={false}></Image>
               <Flex gap="small" align="center">
@@ -1437,6 +1464,7 @@ function App() {
       </Col>
       <Col xl={8} md={6} xs={24} style={{ background: "#8c8c8c" }}></Col>
     </Row>
+    </ConfigProvider>
   );
 }
 
