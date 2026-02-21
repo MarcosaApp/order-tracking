@@ -29,6 +29,7 @@ import {
   CloseCircleOutlined,
   DownloadOutlined,
   LoadingOutlined,
+  LogoutOutlined,
   PlusOutlined,
   SyncOutlined,
   UploadOutlined,
@@ -46,6 +47,7 @@ import type {
 } from "./interfaces/entities";
 import jsPDF from "jspdf";
 import { logoUrl } from "./logo";
+import { Login } from "./components/Login";
 
 const layoutStyle = {
   // backgroundColor: "black",
@@ -98,13 +100,32 @@ function App() {
   const [imageUrl, setImageUrl] = useState<string>();
   const [activeItem, setActiveItem] = useState<string>("");
 
-  const [isAdmin, setIsAdmin] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userRole, setUserRole] = useState<"admin" | "driver" | null>(null);
 
   const { Search: SearchText } = Input;
 
   useEffect(() => {
-    getAllOrders();
-  }, []);
+    if (isAuthenticated && userRole === "admin") {
+      getAllOrders();
+    }
+  }, [isAuthenticated, userRole]);
+
+  const handleLogin = (role: "admin" | "driver") => {
+    setUserRole(role);
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setUserRole(null);
+    setOrders([]);
+    setItems([]);
+    setCollects([]);
+    setDeliveries([]);
+    setSearchedItem(undefined);
+    messageApi.info("Sesión cerrada");
+  };
 
   const getAllOrders = async () => {
     const orders = await httpClient.getAll<GetAllOrders>("order", messageApi);
@@ -341,6 +362,11 @@ function App() {
     }
   };
 
+  // Show login page if not authenticated
+  if (!isAuthenticated) {
+    return <Login onLogin={handleLogin} />;
+  }
+
   return (
     <Row>
       <Col xl={8} md={6} xs={24} style={{ background: "#8c8c8c" }}></Col>
@@ -348,20 +374,25 @@ function App() {
         <Layout style={layoutStyle}>
           <>{contextHolder}</>
           <Header style={headerStyle}>
-            <Flex justify="center" align="center" style={{ height: "100%" }}>
-              <Image src={logo} height={"inherit"}></Image>
-              <Button
-                type={"primary"}
-                onClick={() => {
-                  setIsAdmin(!isAdmin);
-                }}
-              >
-                CAMBIAR ROL
-              </Button>
+            <Flex justify="space-between" align="center" style={{ height: "100%", padding: "0 20px" }}>
+              <Image src={logo} height={"inherit"} preview={false}></Image>
+              <Flex gap="small" align="center">
+                <Tag color={userRole === "admin" ? "blue" : "green"} style={{ fontSize: "14px", padding: "4px 12px" }}>
+                  {userRole === "admin" ? "ADMINISTRADOR" : "PILOTO"}
+                </Tag>
+                <Button
+                  type="primary"
+                  danger
+                  icon={<LogoutOutlined />}
+                  onClick={handleLogout}
+                >
+                  Salir
+                </Button>
+              </Flex>
             </Flex>
           </Header>
           <Content style={contentStyle}>
-            {isAdmin ? (
+            {userRole === "admin" ? (
               <>
                 {/* PANTALLA ADMINISTRADORES */}
                 <Flex
