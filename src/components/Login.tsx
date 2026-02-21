@@ -145,6 +145,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               <div>
                 <strong>Piloto:</strong> driver / driver123
               </div>
+              <div style={{ marginTop: "10px", fontSize: "11px", textAlign: "center", color: "#999" }}>
+                La sesión expira después de 8 horas de inactividad
+              </div>
             </Flex>
           </Flex>
         </Card>

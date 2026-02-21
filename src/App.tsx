@@ -77,6 +77,15 @@ type FileType = Parameters<GetProp<UploadProps, "beforeUpload">>[0];
 
 const httpClient = new HttpService();
 
+// Session expiration time in milliseconds (8 hours)
+const SESSION_DURATION = 8 * 60 * 60 * 1000;
+const SESSION_STORAGE_KEY = "order_tracking_session";
+
+interface SessionData {
+  role: "admin" | "driver";
+  expiresAt: number;
+}
+
 function App() {
   const [messageApi, contextHolder] = message.useMessage();
 
@@ -105,6 +114,73 @@ function App() {
 
   const { Search: SearchText } = Input;
 
+  // Check for existing session on mount
+  useEffect(() => {
+    const checkSession = () => {
+      try {
+        const sessionData = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (sessionData) {
+          const session: SessionData = JSON.parse(sessionData);
+          const now = Date.now();
+
+          // Check if session is still valid
+          if (session.expiresAt > now) {
+            setUserRole(session.role);
+            setIsAuthenticated(true);
+          } else {
+            // Session expired, clear it
+            localStorage.removeItem(SESSION_STORAGE_KEY);
+            messageApi.warning("Sesión expirada. Por favor inicie sesión nuevamente.");
+          }
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+      }
+    };
+
+    checkSession();
+  }, [messageApi]);
+
+  // Periodically check if session has expired (every minute)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkSessionExpiration = () => {
+      try {
+        const sessionData = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (sessionData) {
+          const session: SessionData = JSON.parse(sessionData);
+          const now = Date.now();
+
+          if (session.expiresAt <= now) {
+            // Session expired
+            localStorage.removeItem(SESSION_STORAGE_KEY);
+            setIsAuthenticated(false);
+            setUserRole(null);
+            setOrders([]);
+            setItems([]);
+            setCollects([]);
+            setDeliveries([]);
+            setSearchedItem(undefined);
+            messageApi.warning("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
+          }
+        } else {
+          // Session data missing
+          setIsAuthenticated(false);
+          setUserRole(null);
+        }
+      } catch (error) {
+        console.error("Error checking session expiration:", error);
+      }
+    };
+
+    // Check every minute
+    const interval = setInterval(checkSessionExpiration, 60000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, messageApi]);
+
   useEffect(() => {
     if (isAuthenticated && userRole === "admin") {
       getAllOrders();
@@ -112,11 +188,23 @@ function App() {
   }, [isAuthenticated, userRole]);
 
   const handleLogin = (role: "admin" | "driver") => {
+    const expiresAt = Date.now() + SESSION_DURATION;
+    const sessionData: SessionData = {
+      role,
+      expiresAt,
+    };
+
+    // Save session to localStorage
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+
     setUserRole(role);
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
+    // Clear session from localStorage
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+
     setIsAuthenticated(false);
     setUserRole(null);
     setOrders([]);
