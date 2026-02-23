@@ -8,12 +8,10 @@ import {
   InputNumber,
   Modal,
   Select,
+  Spin,
   Tag,
   Typography,
   Upload,
-  message,
-  type GetProp,
-  type UploadProps,
 } from "antd";
 import Title from "antd/es/typography/Title";
 import { useState } from "react";
@@ -24,173 +22,93 @@ import {
   PlusOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
-import { BASE_URL, HttpService } from "../services/http.service";
+import { BASE_URL } from "../services/api-client";
 import { formatTimeAgo } from "../utils/date.utils";
-import { ENTITIES } from "../enums";
-import type { ItemEntity, OrderEntity } from "../interfaces/entities";
+import type { ItemEntity } from "../interfaces/entities";
+import {
+  useOrders,
+  useCreateOrder,
+  useOrderItems,
+  useCreateItem,
+  useUploadImage,
+} from "../hooks/useOrders";
 
-type FileType = Parameters<GetProp<UploadProps, "beforeUpload">>[0];
-
-interface AdminPageProps {
-  messageApi: ReturnType<typeof message.useMessage>[0];
-}
-
-const httpClient = new HttpService();
-
-export const AdminPage: React.FC<AdminPageProps> = ({ messageApi }) => {
+export const AdminPage: React.FC = () => {
   const [itemForm] = Form.useForm<ItemEntity>();
 
-  const [orders, setOrders] = useState<OrderEntity[]>([]);
-  const [items, setItems] = useState<ItemEntity[]>([]);
-
   const [openItemModal, setOpenItemModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [imageUrl, setImageUrl] = useState<string>();
   const [activeItem, setActiveItem] = useState<string>("");
 
-  const getAllOrders = async () => {
-    const orders = await httpClient.getAll<{ items: OrderEntity[] }>(
-      "order",
-      messageApi
-    );
-    if (orders) {
-      setOrders(orders.items);
-    }
-  };
-
-  useState(() => {
-    getAllOrders();
-  });
+  // React Query hooks
+  const { data: orders = [], isLoading: ordersLoading } = useOrders();
+  const createOrderMutation = useCreateOrder();
+  const { data: items = [] } = useOrderItems(activeItem, !!activeItem);
+  const createItemMutation = useCreateItem();
+  const uploadImageMutation = useUploadImage();
 
   const onCreateOrder = async () => {
-    const order = await httpClient.createOrder<OrderEntity>(
-      ENTITIES.ORDER,
-      messageApi
-    );
-
-    if (order) {
-      await getAllOrders();
-    }
+    await createOrderMutation.mutateAsync();
   };
 
   const onCreateItem = async (item: ItemEntity) => {
-    if (item.orderId) {
-      const itemCreated = await httpClient.createEntity<ItemEntity>(
-        ENTITIES.ITEM,
-        messageApi,
-        item
-      );
-
-      if (itemCreated) {
-        setItems((prevItems) => [...prevItems, { ...itemCreated }]);
-
-        messageApi.success({
-          type: "success",
-          content: "Pedido creado exitosamente",
-        });
-      }
-    }
-
+    await createItemMutation.mutateAsync(item);
     setOpenItemModal(false);
+    setImageUrl(undefined);
+    itemForm.resetFields();
   };
 
-  const onChangeItemCollapse = async (key: string | string[]) => {
-    const [orderId] = key;
-
-    if (!orderId) {
-      setActiveItem("");
-      return;
-    }
-
-    setActiveItem(orderId);
-
-    const itemResult = await httpClient.getItemsByOrder<ItemEntity>(
-      orderId,
-      messageApi
-    );
-
-    if (itemResult?.items) {
-      setItems(itemResult.items);
-    }
+  const onChangeItemCollapse = (key: string | string[]) => {
+    const [orderId] = Array.isArray(key) ? key : [key];
+    setActiveItem(orderId || "");
   };
 
-  const beforeUpload = (file: FileType) => {
+  const beforeUpload = (file: File) => {
     const isJpgOrPng = file.type === "image/jpeg" || file.type === "image/png";
     if (!isJpgOrPng) {
-      message.error("You can only upload JPG/PNG file!");
+      return false;
     }
     const isLt2M = file.size / 1024 / 1024 < 2;
     if (!isLt2M) {
-      message.error("Image must smaller than 2MB!");
+      return false;
     }
     return isJpgOrPng && isLt2M;
   };
 
-  const getBase64 = (img: FileType, callback: (url: string) => void) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => callback(reader.result as string));
-    reader.readAsDataURL(img);
-  };
-
-  const handleChange: UploadProps["onChange"] = (info) => {
+  const handleChange = async (info: any) => {
     if (info.file.status === "uploading") {
-      setIsLoading(true);
       return;
     }
 
     if (info.file.status === "done") {
-      getBase64(info.file.originFileObj as FileType, (url) => {
-        setIsLoading(false);
-        setImageUrl(url);
-      });
-    }
-  };
-
-  const customRequest: UploadProps["customRequest"] = async ({
-    file,
-    onSuccess,
-    onError,
-  }) => {
-    if (file instanceof File) {
       const reader = new FileReader();
-      reader.readAsDataURL(file);
-
-      reader.onload = async () => {
-        const base64Data = reader.result?.toString().split(",")[1];
-
-        const payload = {
-          imageBody: base64Data,
-          fileName: file.name,
-          contentType: file.type,
-        };
-
-        try {
-          const response = await fetch(`${BASE_URL}/manager/image/upload`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          });
-          const data = await response.json();
-          if (onSuccess) {
-            onSuccess(data);
-          }
-          message.success(`${file.name} uploaded successfully!`);
-        } catch (error) {
-          if (onError) {
-            // onError({});
-          }
-          message.error(`${file.name} upload failed.`);
-        }
-      };
-
-      reader.onerror = (error) => {
-        // onError(error);
-        message.error(`File reading failed: ${error}`);
-      };
+      reader.addEventListener("load", () => {
+        setImageUrl(reader.result as string);
+      });
+      reader.readAsDataURL(info.file.originFileObj);
     }
   };
+
+  const customRequest = async ({ file, onSuccess, onError }: any) => {
+    try {
+      const data = await uploadImageMutation.mutateAsync(file as File);
+      if (onSuccess) {
+        onSuccess(data);
+      }
+    } catch (error) {
+      if (onError) {
+        onError(error);
+      }
+    }
+  };
+
+  if (ordersLoading) {
+    return (
+      <Flex justify="center" align="center" style={{ height: "100%" }}>
+        <Spin size="large" />
+      </Flex>
+    );
+  }
 
   return (
     <>
@@ -208,6 +126,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ messageApi }) => {
           htmlType="submit"
           style={{ width: "100%" }}
           onClick={onCreateOrder}
+          loading={createOrderMutation.isPending}
         >
           CREAR ORDEN
         </Button>
@@ -268,8 +187,13 @@ export const AdminPage: React.FC<AdminPageProps> = ({ messageApi }) => {
                             okButtonProps={{
                               autoFocus: true,
                               htmlType: "submit",
+                              loading: createItemMutation.isPending,
                             }}
-                            onCancel={() => setOpenItemModal(false)}
+                            onCancel={() => {
+                              setOpenItemModal(false);
+                              setImageUrl(undefined);
+                              itemForm.resetFields();
+                            }}
                             modalRender={(dom) => (
                               <Form
                                 autoComplete="off"
@@ -333,7 +257,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ messageApi }) => {
                                       }}
                                       type="button"
                                     >
-                                      {isLoading ? (
+                                      {uploadImageMutation.isPending ? (
                                         <LoadingOutlined />
                                       ) : (
                                         <PlusOutlined />

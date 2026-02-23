@@ -1,11 +1,12 @@
 import { Button, Card, Flex, Form, Input, Typography, message } from "antd";
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useState } from "react";
+import { authenticateUser, USERS } from "../utils/auth.utils";
 
 const { Title } = Typography;
 
 interface LoginProps {
-  onLogin: (role: "admin" | "driver") => void;
+  onLogin: (role: "admin" | "driver", username: string) => void;
 }
 
 interface LoginFormValues {
@@ -13,54 +14,30 @@ interface LoginFormValues {
   password: string;
 }
 
-// Hardcoded users
-const USERS = {
-  admin: {
-    username: "admin",
-    password: "admin123",
-    role: "admin" as const,
-  },
-  driver: {
-    username: "driver",
-    password: "driver123",
-    role: "driver" as const,
-  },
-};
-
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = (values: LoginFormValues) => {
+  const handleLogin = async (values: LoginFormValues) => {
     setLoading(true);
 
     // Simulate a slight delay for more realistic UX
-    setTimeout(() => {
+    setTimeout(async () => {
       const { username, password } = values;
 
-      // Check admin credentials
-      if (
-        username === USERS.admin.username &&
-        password === USERS.admin.password
-      ) {
-        messageApi.success("Bienvenido Administrador");
-        setTimeout(() => onLogin(USERS.admin.role), 500);
-        return;
-      }
+      // Authenticate user
+      const user = authenticateUser(username, password);
 
-      // Check driver credentials
-      if (
-        username === USERS.driver.username &&
-        password === USERS.driver.password
-      ) {
-        messageApi.success("Bienvenido Piloto");
-        setTimeout(() => onLogin(USERS.driver.role), 500);
-        return;
+      if (user) {
+        const welcomeMessage =
+          user.role === "admin" ? "Bienvenido Administrador" : "Bienvenido Piloto";
+        messageApi.success(welcomeMessage);
+        setTimeout(() => onLogin(user.role, user.username), 500);
+      } else {
+        // Invalid credentials
+        messageApi.error("Usuario o contraseña incorrectos");
+        setLoading(false);
       }
-
-      // Invalid credentials
-      messageApi.error("Usuario o contraseña incorrectos");
-      setLoading(false);
     }, 500);
   };
 

@@ -5,6 +5,7 @@ import {
   Layout,
   Row,
   Tag,
+  Typography,
   message,
   Image,
   ConfigProvider,
@@ -18,6 +19,7 @@ import logo from "./assets/logo.jpeg";
 import { Login } from "./components/Login";
 import { AdminPage } from "./pages/AdminPage";
 import { DriverPage } from "./pages/DriverPage";
+import { createSession, validateSession } from "./utils/auth.utils";
 
 const layoutStyle = {
   overflow: "hidden",
@@ -37,34 +39,28 @@ const contentStyle: React.CSSProperties = {
 const SESSION_DURATION = 8 * 60 * 60 * 1000;
 const SESSION_STORAGE_KEY = "order_tracking_session";
 
-interface SessionData {
-  role: "admin" | "driver";
-  expiresAt: number;
-}
-
 function App() {
   const [messageApi, contextHolder] = message.useMessage();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userRole, setUserRole] = useState<"admin" | "driver" | null>(null);
+  const [username, setUsername] = useState<string>("");
 
   // Check for existing session on mount
   useEffect(() => {
-    const checkSession = () => {
+    const checkSession = async () => {
       try {
-        const sessionData = localStorage.getItem(SESSION_STORAGE_KEY);
-        if (sessionData) {
-          const session: SessionData = JSON.parse(sessionData);
-          const now = Date.now();
+        const sessionString = localStorage.getItem(SESSION_STORAGE_KEY);
+        const sessionData = await validateSession(sessionString);
 
-          // Check if session is still valid
-          if (session.expiresAt > now) {
-            setUserRole(session.role);
-            setIsAuthenticated(true);
-          } else {
-            // Session expired, clear it
-            localStorage.removeItem(SESSION_STORAGE_KEY);
-            messageApi.warning("Sesión expirada. Por favor inicie sesión nuevamente.");
-          }
+        if (sessionData) {
+          // Valid session found
+          setUserRole(sessionData.role);
+          setUsername(sessionData.username);
+          setIsAuthenticated(true);
+        } else if (sessionString) {
+          // Invalid or expired session
+          localStorage.removeItem(SESSION_STORAGE_KEY);
+          messageApi.warning("Sesión expirada o inválida. Por favor inicie sesión nuevamente.");
         }
       } catch (error) {
         console.error("Error checking session:", error);
@@ -75,28 +71,22 @@ function App() {
     checkSession();
   }, [messageApi]);
 
-  // Periodically check if session has expired (every minute)
+  // Periodically check if session has expired or been tampered with (every minute)
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const checkSessionExpiration = () => {
+    const checkSessionExpiration = async () => {
       try {
-        const sessionData = localStorage.getItem(SESSION_STORAGE_KEY);
-        if (sessionData) {
-          const session: SessionData = JSON.parse(sessionData);
-          const now = Date.now();
+        const sessionString = localStorage.getItem(SESSION_STORAGE_KEY);
+        const sessionData = await validateSession(sessionString);
 
-          if (session.expiresAt <= now) {
-            // Session expired
-            localStorage.removeItem(SESSION_STORAGE_KEY);
-            setIsAuthenticated(false);
-            setUserRole(null);
-            messageApi.warning("Su sesión ha expirado. Por favor inicie sesión nuevamente.");
-          }
-        } else {
-          // Session data missing
+        if (!sessionData) {
+          // Session expired or tampered with
+          localStorage.removeItem(SESSION_STORAGE_KEY);
           setIsAuthenticated(false);
           setUserRole(null);
+          setUsername("");
+          messageApi.warning("Su sesión ha expirado o ha sido modificada. Por favor inicie sesión nuevamente.");
         }
       } catch (error) {
         console.error("Error checking session expiration:", error);
@@ -109,17 +99,17 @@ function App() {
     return () => clearInterval(interval);
   }, [isAuthenticated, messageApi]);
 
-  const handleLogin = (role: "admin" | "driver") => {
+  const handleLogin = async (role: "admin" | "driver", username: string) => {
     const expiresAt = Date.now() + SESSION_DURATION;
-    const sessionData: SessionData = {
-      role,
-      expiresAt,
-    };
 
-    // Save session to localStorage
-    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+    // Create signed session with cryptographic signature
+    const signedSession = await createSession(role, username, expiresAt);
+
+    // Save signed session to localStorage
+    localStorage.setItem(SESSION_STORAGE_KEY, signedSession);
 
     setUserRole(role);
+    setUsername(username);
     setIsAuthenticated(true);
   };
 
@@ -129,6 +119,7 @@ function App() {
 
     setIsAuthenticated(false);
     setUserRole(null);
+    setUsername("");
     messageApi.info("Sesión cerrada");
   };
 
@@ -172,9 +163,14 @@ function App() {
               <Flex justify="space-between" align="center" style={{ height: "100%", padding: "0 20px" }}>
                 <Image src={logo} height={"inherit"} preview={false}></Image>
                 <Flex gap="small" align="center">
-                  <Tag color={userRole === "admin" ? "blue" : "green"} style={{ fontSize: "14px", padding: "4px 12px" }}>
-                    {userRole === "admin" ? "ADMINISTRADOR" : "PILOTO"}
-                  </Tag>
+                  <Flex vertical align="end" style={{ marginRight: 8 }}>
+                    <Typography.Text style={{ color: "white", fontSize: "12px" }}>
+                      {username}
+                    </Typography.Text>
+                    <Tag color={userRole === "admin" ? "blue" : "green"} style={{ fontSize: "11px", padding: "2px 8px", margin: 0 }}>
+                      {userRole === "admin" ? "ADMINISTRADOR" : "PILOTO"}
+                    </Tag>
+                  </Flex>
                   <Button
                     type="primary"
                     danger
@@ -188,9 +184,9 @@ function App() {
             </Header>
             <Content style={contentStyle}>
               {userRole === "admin" ? (
-                <AdminPage messageApi={messageApi} />
+                <AdminPage />
               ) : (
-                <DriverPage messageApi={messageApi} />
+                <DriverPage />
               )}
             </Content>
           </Layout>

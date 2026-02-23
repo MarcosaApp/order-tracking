@@ -9,7 +9,6 @@ import {
   Modal,
   Tag,
   Typography,
-  message,
 } from "antd";
 import Title from "antd/es/typography/Title";
 import { useState } from "react";
@@ -19,9 +18,7 @@ import {
   DownloadOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
-import { HttpService } from "../services/http.service";
 import { formatTimeAgo } from "../utils/date.utils";
-import { ENTITIES } from "../enums";
 import type {
   CollectEntity,
   DeliveryEntity,
@@ -29,123 +26,79 @@ import type {
 } from "../interfaces/entities";
 import jsPDF from "jspdf";
 import { logoUrl } from "../logo";
+import {
+  useSearchItem,
+  useCollects,
+  useCreateCollect,
+  useDeliveries,
+  useCreateDelivery,
+} from "../hooks/useDriver";
 
 const { Search: SearchText } = Input;
 
-interface DriverPageProps {
-  messageApi: ReturnType<typeof message.useMessage>[0];
-}
-
-const httpClient = new HttpService();
-
-export const DriverPage: React.FC<DriverPageProps> = ({ messageApi }) => {
+export const DriverPage: React.FC = () => {
   const [collectForm] = Form.useForm<CollectEntity>();
   const [deliveryForm] = Form.useForm<DeliveryEntity>();
 
-  const [collects, setCollects] = useState<CollectEntity[]>([]);
-  const [deliveries, setDeliveries] = useState<DeliveryEntity[]>([]);
   const [searchedItem, setSearchedItem] = useState<ItemEntity>();
-
   const [openCollectModal, setOpenCollectModal] = useState(false);
   const [openDeliveryModal, setOpenDeliveryModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeCollapse, setActiveCollapse] = useState<string>();
+
+  // React Query hooks
+  const searchMutation = useSearchItem();
+  const { data: collects = [], refetch: refetchCollects } = useCollects(
+    searchedItem?.voucherId || "",
+    activeCollapse === "collect" && !!searchedItem
+  );
+  const createCollectMutation = useCreateCollect();
+  const { data: deliveries = [], refetch: refetchDeliveries } = useDeliveries(
+    searchedItem?.voucherId || "",
+    activeCollapse === "delivery" && !!searchedItem
+  );
+  const createDeliveryMutation = useCreateDelivery();
 
   const onSearch = async (searchValue: string) => {
-    setIsLoading(true);
-
-    const searchResult = await httpClient.getEntity<ItemEntity>(
-      ENTITIES.ITEM,
-      messageApi,
-      searchValue
-    );
-
-    setIsLoading(false);
-    setSearchedItem(searchResult);
+    const item = await searchMutation.mutateAsync(searchValue);
+    if (item) {
+      setSearchedItem(item);
+      setActiveCollapse(undefined);
+    }
   };
 
-  const onCreateCollect = async (collect: CollectEntity, voucherId: string) => {
-    const { driver, truck, quantity } = collect;
+  const onCreateCollect = async (collect: CollectEntity) => {
+    if (!searchedItem) return;
 
-    const collectCreated = await httpClient.createCollect(messageApi, {
-      voucherId,
-      driver,
-      truck,
-      quantity,
+    const result = await createCollectMutation.mutateAsync({
+      ...collect,
+      voucherId: searchedItem.voucherId,
     });
 
-    if (collectCreated) {
-      if (collectCreated.item && collectCreated.collect) {
-        messageApi.success({
-          type: "success",
-          content: "Recolecta creada exitosamente",
-        });
-
-        setSearchedItem(collectCreated.item);
-        setCollects((prevItems) => [
-          ...prevItems,
-          { ...collectCreated.collect },
-        ]);
-      }
+    if (result) {
+      setSearchedItem(result.item);
+      refetchCollects();
     }
 
     setOpenCollectModal(false);
+    collectForm.resetFields();
   };
 
-  const onCreateDelivery = async (delivery: DeliveryEntity, itemId: string) => {
-    const { customer, driver, truck, quantity } = delivery;
+  const onCreateDelivery = async (delivery: DeliveryEntity) => {
+    if (!searchedItem) return;
 
-    const deliveryCreated = await httpClient.createEntity<DeliveryEntity>(
-      ENTITIES.DELIVERY,
-      messageApi,
-      {
-        voucherId: itemId,
-        customer,
-        driver,
-        truck,
-        quantity,
-      }
-    );
+    await createDeliveryMutation.mutateAsync({
+      ...delivery,
+      voucherId: searchedItem.voucherId,
+    });
 
-    if (deliveryCreated) {
-      messageApi.success({
-        type: "success",
-        content: "Entrega creada exitosamente",
-      });
-
-      setDeliveries((prevItems) => [...prevItems, { ...deliveryCreated }]);
-    }
-
+    refetchDeliveries();
     setOpenDeliveryModal(false);
+    deliveryForm.resetFields();
   };
 
-  const onChangeDriverCollapse = async (
-    key: string | string[],
-    itemId: string
-  ) => {
-    const [entity] = key;
-
-    if (entity) {
-      if (entity === ENTITIES.COLLECT) {
-        const collectsResult =
-          await httpClient.getCollectsByItem<CollectEntity>(itemId, messageApi);
-
-        if (collectsResult?.items) {
-          setCollects(collectsResult.items);
-        }
-      }
-
-      if (entity === ENTITIES.DELIVERY) {
-        const deliveryResult =
-          await httpClient.getDeliveriesByItem<DeliveryEntity>(
-            itemId,
-            messageApi
-          );
-
-        if (deliveryResult?.items) {
-          setDeliveries(deliveryResult.items);
-        }
-      }
-    }
+  const onChangeDriverCollapse = (key: string | string[]) => {
+    const [entity] = Array.isArray(key) ? key : [key];
+    setActiveCollapse(entity);
   };
 
   return (
@@ -157,7 +110,7 @@ export const DriverPage: React.FC<DriverPageProps> = ({ messageApi }) => {
       >
         <SearchText
           enterButton
-          loading={isLoading}
+          loading={searchMutation.isPending}
           onSearch={onSearch}
         />
       </Flex>
@@ -224,6 +177,7 @@ export const DriverPage: React.FC<DriverPageProps> = ({ messageApi }) => {
 
               <Collapse
                 accordion
+                activeKey={activeCollapse}
                 items={[
                   {
                     key: "collect",
@@ -248,8 +202,12 @@ export const DriverPage: React.FC<DriverPageProps> = ({ messageApi }) => {
                           okButtonProps={{
                             autoFocus: true,
                             htmlType: "submit",
+                            loading: createCollectMutation.isPending,
                           }}
-                          onCancel={() => setOpenCollectModal(false)}
+                          onCancel={() => {
+                            setOpenCollectModal(false);
+                            collectForm.resetFields();
+                          }}
                           destroyOnHidden
                           modalRender={(dom) => (
                             <Form
@@ -260,7 +218,7 @@ export const DriverPage: React.FC<DriverPageProps> = ({ messageApi }) => {
                               initialValues={{ modifier: "public" }}
                               clearOnDestroy
                               onFinish={(values) => {
-                                onCreateCollect(values, searchedItem.voucherId);
+                                onCreateCollect(values);
                               }}
                             >
                               {dom}
@@ -409,8 +367,12 @@ export const DriverPage: React.FC<DriverPageProps> = ({ messageApi }) => {
                           okButtonProps={{
                             autoFocus: true,
                             htmlType: "submit",
+                            loading: createDeliveryMutation.isPending,
                           }}
-                          onCancel={() => setOpenDeliveryModal(false)}
+                          onCancel={() => {
+                            setOpenDeliveryModal(false);
+                            deliveryForm.resetFields();
+                          }}
                           destroyOnHidden
                           modalRender={(dom) => (
                             <Form
@@ -421,7 +383,7 @@ export const DriverPage: React.FC<DriverPageProps> = ({ messageApi }) => {
                               initialValues={{ modifier: "public" }}
                               clearOnDestroy
                               onFinish={(values) => {
-                                onCreateDelivery(values, searchedItem.voucherId);
+                                onCreateDelivery(values);
                               }}
                             >
                               {dom}
@@ -680,7 +642,7 @@ export const DriverPage: React.FC<DriverPageProps> = ({ messageApi }) => {
                   },
                 ]}
                 onChange={(key) => {
-                  onChangeDriverCollapse(key, searchedItem.voucherId);
+                  onChangeDriverCollapse(key);
                 }}
               />
             </Flex>
