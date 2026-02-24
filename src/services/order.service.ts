@@ -48,7 +48,27 @@ export const orderService = {
   createDelivery: (delivery: Partial<DeliveryEntity>) =>
     apiClient.post<DeliveryEntity>("/delivery", delivery),
 
+  // Delete order
+  deleteOrder: (id: string) =>
+    apiClient.delete<OrderEntity>(`/order/${id}`),
+
+  // Update order
+  updateOrder: (id: string, data: Partial<OrderEntity>) =>
+    apiClient.put<OrderEntity>(`/order/${id}`, data),
+
+  // Delete item
+  deleteItem: (voucherId: string) =>
+    apiClient.delete<ItemEntity>(`/item/${voucherId}`),
+
+  // Update item
+  updateItem: (voucherId: string, data: Partial<ItemEntity>) =>
+    apiClient.put<ItemEntity>(`/item/${voucherId}`, data),
+
   // File upload
   uploadImage: (file: File) =>
     apiClient.uploadFile("/manager/image/upload", file),
+
+  // Get signed URL by key
+  getImageSignedUrl: (key: string) =>
+    apiClient.get<string>(`/manager/image/${key}`),
 };

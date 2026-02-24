@@ -7,6 +7,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Select,
   Spin,
   Tag,
@@ -18,27 +19,42 @@ import { useState } from "react";
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DeleteOutlined,
+  EditOutlined,
+  EyeOutlined,
   LoadingOutlined,
   PlusOutlined,
   SyncOutlined,
 } from "@ant-design/icons";
 import { BASE_URL } from "../services/api-client";
 import { formatTimeAgo } from "../utils/date.utils";
-import type { ItemEntity } from "../interfaces/entities";
+import type { ItemEntity, OrderEntity } from "../interfaces/entities";
 import {
   useOrders,
   useCreateOrder,
   useOrderItems,
   useCreateItem,
   useUploadImage,
+  useGetImageSignedUrl,
+  useDeleteOrder,
+  useUpdateOrder,
+  useDeleteItem,
+  useUpdateItem,
 } from "../hooks/useOrders";
 
 export const AdminPage: React.FC = () => {
   const [itemForm] = Form.useForm<ItemEntity>();
+  const [editOrderForm] = Form.useForm<Partial<OrderEntity>>();
+  const [editItemForm] = Form.useForm<Partial<ItemEntity>>();
 
   const [openItemModal, setOpenItemModal] = useState(false);
   const [imageUrl, setImageUrl] = useState<string>();
   const [activeItem, setActiveItem] = useState<string>("");
+  const [openEditOrderModal, setOpenEditOrderModal] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<OrderEntity | null>(null);
+  const [openEditItemModal, setOpenEditItemModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<ItemEntity | null>(null);
+  const [voucherImageUrl, setVoucherImageUrl] = useState<string | undefined>();
 
   // React Query hooks
   const { data: orders = [], isLoading: ordersLoading } = useOrders();
@@ -46,6 +62,11 @@ export const AdminPage: React.FC = () => {
   const { data: items = [] } = useOrderItems(activeItem, !!activeItem);
   const createItemMutation = useCreateItem();
   const uploadImageMutation = useUploadImage();
+  const getImageSignedUrlMutation = useGetImageSignedUrl();
+  const deleteOrderMutation = useDeleteOrder();
+  const updateOrderMutation = useUpdateOrder();
+  const deleteItemMutation = useDeleteItem();
+  const updateItemMutation = useUpdateItem();
 
   const onCreateOrder = async () => {
     await createOrderMutation.mutateAsync();
@@ -56,6 +77,51 @@ export const AdminPage: React.FC = () => {
     setOpenItemModal(false);
     setImageUrl(undefined);
     itemForm.resetFields();
+  };
+
+  const onDeleteOrder = async (id: string) => {
+    await deleteOrderMutation.mutateAsync(id);
+  };
+
+  const onOpenEditOrder = (order: OrderEntity) => {
+    setEditingOrder(order);
+    editOrderForm.setFieldsValue({ status: order.status });
+    setOpenEditOrderModal(true);
+  };
+
+  const onUpdateOrder = async (values: Partial<OrderEntity>) => {
+    if (!editingOrder) return;
+    await updateOrderMutation.mutateAsync({ id: editingOrder.id, data: values });
+    setOpenEditOrderModal(false);
+    setEditingOrder(null);
+    editOrderForm.resetFields();
+  };
+
+  const onDeleteItem = async (voucherId: string, orderId: string) => {
+    await deleteItemMutation.mutateAsync({ voucherId, orderId });
+  };
+
+  const onOpenEditItem = (item: ItemEntity) => {
+    setEditingItem(item);
+    editItemForm.setFieldsValue({
+      voucherId: item.voucherId,
+      product: item.product,
+      quantity: item.quantity,
+      status: item.status,
+    });
+    setOpenEditItemModal(true);
+  };
+
+  const onUpdateItem = async (values: Partial<ItemEntity>) => {
+    if (!editingItem) return;
+    await updateItemMutation.mutateAsync({
+      voucherId: editingItem.voucherId,
+      orderId: editingItem.orderId,
+      data: values,
+    });
+    setOpenEditItemModal(false);
+    setEditingItem(null);
+    editItemForm.resetFields();
   };
 
   const onChangeItemCollapse = (key: string | string[]) => {
@@ -75,18 +141,19 @@ export const AdminPage: React.FC = () => {
     return isJpgOrPng && isLt2M;
   };
 
-  const handleChange = async (info: any) => {
-    if (info.file.status === "uploading") {
-      return;
-    }
-
+  const handleChange = (info: any) => {
     if (info.file.status === "done") {
+      const key = info.file.response;
+      itemForm.setFieldValue("voucherKey", key);
       const reader = new FileReader();
-      reader.addEventListener("load", () => {
-        setImageUrl(reader.result as string);
-      });
+      reader.onload = () => setImageUrl(reader.result as string);
       reader.readAsDataURL(info.file.originFileObj);
     }
+  };
+
+  const onViewVoucherImage = async (key: string) => {
+    const url = await getImageSignedUrlMutation.mutateAsync(key);
+    setVoucherImageUrl(url);
   };
 
   const customRequest = async ({ file, onSuccess, onError }: any) => {
@@ -149,6 +216,31 @@ export const AdminPage: React.FC = () => {
               title={`ORDEN - ${order.createdAt.toString(36).toUpperCase()}`}
               id={order.id}
               key={order.id}
+              extra={
+                <Flex gap="small">
+                  <Button
+                    size="small"
+                    icon={<EditOutlined />}
+                    onClick={() => onOpenEditOrder(order)}
+                  />
+                  {activeItem === order.id && items.length === 0 && (
+                    <Popconfirm
+                      title="Eliminar orden"
+                      description="¿Estás seguro de eliminar esta orden?"
+                      okText="Sí"
+                      cancelText="No"
+                      onConfirm={() => onDeleteOrder(order.id)}
+                    >
+                      <Button
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        loading={deleteOrderMutation.isPending}
+                      />
+                    </Popconfirm>
+                  )}
+                </Flex>
+              }
             >
               <Flex gap={"middle"} vertical>
                 <Flex justify={"space-between"}>
@@ -229,7 +321,7 @@ export const AdminPage: React.FC = () => {
                                 <Input name="reference"></Input>
                               </Form.Item>
 
-                              <Form.Item name="voucherLink">
+                              <Form.Item name="voucherKey">
                                 <Upload
                                   maxCount={1}
                                   multiple={false}
@@ -341,6 +433,47 @@ export const AdminPage: React.FC = () => {
                                   return {
                                     key: item.id,
                                     label: `Comprobante - ${item?.voucherId}`,
+                                    extra: (
+                                      <Flex
+                                        gap="small"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {item.voucherKey && (
+                                          <Button
+                                            size="small"
+                                            icon={<EyeOutlined />}
+                                            loading={getImageSignedUrlMutation.isPending && getImageSignedUrlMutation.variables === item.voucherKey}
+                                            onClick={() => onViewVoucherImage(item.voucherKey!)}
+                                          />
+                                        )}
+                                        <Button
+                                          size="small"
+                                          icon={<EditOutlined />}
+                                          onClick={() => onOpenEditItem(item)}
+                                        />
+                                        <Popconfirm
+                                          title="Eliminar pedido"
+                                          description="¿Estás seguro de eliminar este pedido?"
+                                          okText="Sí"
+                                          cancelText="No"
+                                          onConfirm={() =>
+                                            onDeleteItem(
+                                              item.voucherId,
+                                              item.orderId
+                                            )
+                                          }
+                                        >
+                                          <Button
+                                            size="small"
+                                            danger
+                                            icon={<DeleteOutlined />}
+                                            loading={
+                                              deleteItemMutation.isPending
+                                            }
+                                          />
+                                        </Popconfirm>
+                                      </Flex>
+                                    ),
                                     children: (
                                       <Flex
                                         vertical
@@ -440,6 +573,113 @@ export const AdminPage: React.FC = () => {
           <Flex></Flex>
         )}
       </Flex>
+
+      {/* Modal editar orden */}
+      <Modal
+        open={openEditOrderModal}
+        destroyOnHidden
+        title="Editar orden"
+        okText="Guardar"
+        cancelText="Cancelar"
+        okButtonProps={{
+          htmlType: "submit",
+          loading: updateOrderMutation.isPending,
+        }}
+        onCancel={() => {
+          setOpenEditOrderModal(false);
+          setEditingOrder(null);
+          editOrderForm.resetFields();
+        }}
+        modalRender={(dom) => (
+          <Form layout="vertical" form={editOrderForm} onFinish={onUpdateOrder}>
+            {dom}
+          </Form>
+        )}
+      >
+        <Form.Item name="status" label="Estado">
+          <Select
+            options={[
+              { value: "PENDIENTE", label: "PENDIENTE" },
+              { value: "EN RUTA", label: "EN RUTA" },
+              { value: "RECOLECTADO", label: "RECOLECTADO" },
+            ]}
+          />
+        </Form.Item>
+      </Modal>
+
+      {/* Modal editar pedido */}
+      <Modal
+        open={openEditItemModal}
+        destroyOnHidden
+        title="Editar pedido"
+        okText="Guardar"
+        cancelText="Cancelar"
+        okButtonProps={{
+          htmlType: "submit",
+          loading: updateItemMutation.isPending,
+        }}
+        onCancel={() => {
+          setOpenEditItemModal(false);
+          setEditingItem(null);
+          editItemForm.resetFields();
+        }}
+        modalRender={(dom) => (
+          <Form layout="vertical" form={editItemForm} onFinish={onUpdateItem}>
+            {dom}
+          </Form>
+        )}
+      >
+        <Form.Item
+          name="voucherId"
+          label="Comprobante"
+          rules={[{ required: true, message: "Campo requerido" }]}
+        >
+          <Input />
+        </Form.Item>
+        <Form.Item
+          name="quantity"
+          label="Cantidad"
+          rules={[{ required: true, message: "Campo requerido" }]}
+        >
+          <InputNumber style={{ width: "100%" }} />
+        </Form.Item>
+        <Form.Item
+          name="product"
+          label="Producto"
+          rules={[{ required: true, message: "Campo requerido" }]}
+        >
+          <Select
+            options={[
+              { value: "Monocapa Gris", label: "Monocapa Gris" },
+              { value: "Monocapa Blanco", label: "Monocapa Blanco" },
+              { value: "Horcalsa", label: "Horcalsa" },
+              { value: "Montaña", label: "Montaña" },
+              { value: "Cemento Ariblock", label: "Cemento Ariblock" },
+              { value: "Monocapa Extraliso", label: "Monocapa Extraliso" },
+              { value: "Monocapa Ultraliso", label: "Monocapa Ultraliso" },
+            ]}
+          />
+        </Form.Item>
+        <Form.Item name="status" label="Estado">
+          <Select
+            options={[
+              { value: "PENDIENTE", label: "PENDIENTE" },
+              { value: "EN RUTA", label: "EN RUTA" },
+              { value: "RECOLECTADO", label: "RECOLECTADO" },
+            ]}
+          />
+        </Form.Item>
+      </Modal>
+
+      {/* Modal ver comprobante */}
+      <Modal
+        open={!!voucherImageUrl}
+        title="Comprobante"
+        footer={null}
+        onCancel={() => setVoucherImageUrl(undefined)}
+      >
+        <img src={voucherImageUrl} alt="comprobante" style={{ width: "100%" }} />
+      </Modal>
     </>
   );
 };

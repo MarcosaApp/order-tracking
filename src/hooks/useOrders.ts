@@ -56,7 +56,7 @@ export const useCreateItem = () => {
 
   return useMutation({
     mutationFn: (item: Partial<ItemEntity>) => orderService.createItem(item),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate the specific order's items
       if (variables.orderId) {
         queryClient.invalidateQueries({
@@ -71,17 +71,110 @@ export const useCreateItem = () => {
   });
 };
 
+// Get image signed URL
+export const useGetImageSignedUrl = () => {
+  const [messageApi] = message.useMessage();
+
+  return useMutation({
+    mutationFn: (key: string) => orderService.getImageSignedUrl(key),
+    onError: (error: Error) => {
+      messageApi.error(error.message || "Error al obtener la imagen");
+    },
+  });
+};
+
 // Upload image
 export const useUploadImage = () => {
   const [messageApi] = message.useMessage();
 
   return useMutation({
     mutationFn: (file: File) => orderService.uploadImage(file),
-    onSuccess: (data, file) => {
+    onSuccess: (_data, file) => {
       messageApi.success(`${file.name} cargado exitosamente`);
     },
     onError: (error: Error, file) => {
       messageApi.error(`Error al cargar ${file.name}: ${error.message}`);
+    },
+  });
+};
+
+// Delete order
+export const useDeleteOrder = () => {
+  const queryClient = useQueryClient();
+  const [messageApi] = message.useMessage();
+
+  return useMutation({
+    mutationFn: (id: string) => orderService.deleteOrder(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderKeys.lists() });
+      messageApi.success("Orden eliminada exitosamente");
+    },
+    onError: (error: Error) => {
+      messageApi.error(error.message || "Error al eliminar la orden");
+    },
+  });
+};
+
+// Update order
+export const useUpdateOrder = () => {
+  const queryClient = useQueryClient();
+  const [messageApi] = message.useMessage();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<OrderEntity> }) =>
+      orderService.updateOrder(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: orderKeys.lists() });
+      messageApi.success("Orden actualizada exitosamente");
+    },
+    onError: (error: Error) => {
+      messageApi.error(error.message || "Error al actualizar la orden");
+    },
+  });
+};
+
+// Delete item
+export const useDeleteItem = () => {
+  const queryClient = useQueryClient();
+  const [messageApi] = message.useMessage();
+
+  return useMutation({
+    mutationFn: ({ voucherId }: { voucherId: string; orderId: string }) =>
+      orderService.deleteItem(voucherId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: orderKeys.items(variables.orderId),
+      });
+      messageApi.success("Pedido eliminado exitosamente");
+    },
+    onError: (error: Error) => {
+      messageApi.error(error.message || "Error al eliminar el pedido");
+    },
+  });
+};
+
+// Update item
+export const useUpdateItem = () => {
+  const queryClient = useQueryClient();
+  const [messageApi] = message.useMessage();
+
+  return useMutation({
+    mutationFn: ({
+      voucherId,
+      data,
+    }: {
+      voucherId: string;
+      orderId: string;
+      data: Partial<ItemEntity>;
+    }) => orderService.updateItem(voucherId, data),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: orderKeys.items(variables.orderId),
+      });
+      messageApi.success("Pedido actualizado exitosamente");
+    },
+    onError: (error: Error) => {
+      messageApi.error(error.message || "Error al actualizar el pedido");
     },
   });
 };

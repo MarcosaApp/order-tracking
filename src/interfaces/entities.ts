@@ -12,7 +12,7 @@ export interface ItemEntity {
   product: string;
   quantity: number;
   collected: number;
-  voucherLink?: string;
+  voucherKey?: string;
   status?: string;
   createdAt: number;
   updateAt: number;
@@ -35,7 +35,6 @@ export interface DeliveryEntity {
   truck: string;
   quantity: number;
   customer: string;
-  voucherLink?: string;
   createdAt?: number;
   updateAt?: number;
 }
