@@ -1,7 +1,17 @@
-import { Button, Card, Flex, Form, Input, Typography, message } from "antd";
+import {
+  Button,
+  Card,
+  ConfigProvider,
+  Flex,
+  Form,
+  Input,
+  Typography,
+  message,
+  theme as antTheme,
+} from "antd";
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import { useState } from "react";
-import { authenticateUser, USERS } from "../utils/auth.utils";
+import { authenticateUser } from "../utils/auth.utils";
 
 const { Title } = Typography;
 
@@ -20,21 +30,15 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   const handleLogin = async (values: LoginFormValues) => {
     setLoading(true);
-
-    // Simulate a slight delay for more realistic UX
     setTimeout(async () => {
       const { username, password } = values;
-
-      // Authenticate user
       const user = authenticateUser(username, password);
-
       if (user) {
         const welcomeMessage =
           user.role === "admin" ? "Bienvenido Administrador" : "Bienvenido Piloto";
         messageApi.success(welcomeMessage);
         setTimeout(() => onLogin(user.role, user.username), 500);
       } else {
-        // Invalid credentials
         messageApi.error("Usuario o contraseña incorrectos");
         setLoading(false);
       }
@@ -44,91 +48,174 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   return (
     <>
       {contextHolder}
-      <Flex
-        justify="center"
-        align="center"
-        style={{
-          minHeight: "100vh",
-          background: "linear-gradient(135deg, #1890ff 0%, #096dd9 100%)",
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+      `}</style>
+      <ConfigProvider
+        theme={{
+          algorithm: antTheme.darkAlgorithm,
+          token: {
+            colorPrimary: "#1f6feb",
+            fontFamily: "'DM Sans', sans-serif",
+            colorBgContainer: "#161b22",
+            colorBorder: "#30363d",
+            colorText: "#e6edf3",
+            colorTextPlaceholder: "#8b949e",
+          },
         }}
       >
-        <Card
-          style={{
-            width: 400,
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          }}
+        <Flex
+          justify="center"
+          align="center"
+          style={{ minHeight: "100vh", background: "#0d1117" }}
         >
-          <Flex vertical gap="large">
-            <Title level={2} style={{ textAlign: "center", margin: 0 }}>
-              Iniciar Sesión
-            </Title>
-
-            <Form
-              name="login"
-              onFinish={handleLogin}
-              autoComplete="off"
-              layout="vertical"
-              size="large"
-            >
-              <Form.Item
-                name="username"
-                rules={[
-                  {
-                    required: true,
-                    message: "Por favor ingrese su usuario",
-                  },
-                ]}
+          <Flex
+            vertical
+            align="center"
+            gap={32}
+            style={{ width: 400, padding: "0 16px" }}
+          >
+            {/* Logo */}
+            <Flex align="center" gap={10}>
+              <span
+                style={{
+                  fontSize: 34,
+                  lineHeight: 1,
+                  filter: "drop-shadow(0 0 10px #58a6ff)",
+                }}
               >
-                <Input
-                  prefix={<UserOutlined />}
-                  placeholder="Usuario"
-                  autoComplete="username"
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="password"
-                rules={[
-                  {
-                    required: true,
-                    message: "Por favor ingrese su contraseña",
-                  },
-                ]}
+                ⬡
+              </span>
+              <span
+                style={{
+                  fontFamily: "'Syne', sans-serif",
+                  fontWeight: 800,
+                  fontSize: 26,
+                  color: "#e6edf3",
+                  letterSpacing: "-0.5px",
+                }}
               >
-                <Input.Password
-                  prefix={<LockOutlined />}
-                  placeholder="Contraseña"
-                  autoComplete="current-password"
-                />
-              </Form.Item>
-
-              <Form.Item>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  block
-                  loading={loading}
-                  style={{ height: 45 }}
-                >
-                  Ingresar
-                </Button>
-              </Form.Item>
-            </Form>
-
-            <Flex vertical gap="small" style={{ fontSize: "12px", color: "#888" }}>
-              <div>
-                <strong>Admin:</strong> admin / admin123
-              </div>
-              <div>
-                <strong>Piloto:</strong> driver / driver123
-              </div>
-              <div style={{ marginTop: "10px", fontSize: "11px", textAlign: "center", color: "#999" }}>
-                La sesión expira después de 8 horas de inactividad
-              </div>
+                OrderFlow
+              </span>
             </Flex>
+
+            {/* Card */}
+            <Card
+              style={{
+                width: "100%",
+                background: "#161b22",
+                border: "1px solid #30363d",
+                borderRadius: 12,
+              }}
+            >
+              <Flex vertical gap="large">
+                <Flex vertical align="center" gap={4}>
+                  <Title
+                    level={3}
+                    style={{
+                      margin: 0,
+                      fontFamily: "'Syne', sans-serif",
+                      color: "#e6edf3",
+                    }}
+                  >
+                    Iniciar Sesión
+                  </Title>
+                  <Typography.Text style={{ color: "#8b949e", fontSize: 13 }}>
+                    Ingresa tus credenciales para continuar
+                  </Typography.Text>
+                </Flex>
+
+                <Form
+                  name="login"
+                  onFinish={handleLogin}
+                  autoComplete="off"
+                  layout="vertical"
+                  size="large"
+                >
+                  <Form.Item
+                    name="username"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Por favor ingrese su usuario",
+                      },
+                    ]}
+                  >
+                    <Input
+                      prefix={<UserOutlined style={{ color: "#8b949e" }} />}
+                      placeholder="Usuario"
+                      autoComplete="username"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="password"
+                    rules={[
+                      {
+                        required: true,
+                        message: "Por favor ingrese su contraseña",
+                      },
+                    ]}
+                  >
+                    <Input.Password
+                      prefix={<LockOutlined style={{ color: "#8b949e" }} />}
+                      placeholder="Contraseña"
+                      autoComplete="current-password"
+                    />
+                  </Form.Item>
+
+                  <Form.Item style={{ marginBottom: 0 }}>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      block
+                      loading={loading}
+                      style={{
+                        height: 45,
+                        fontFamily: "'DM Sans', sans-serif",
+                        fontWeight: 500,
+                        background: "#1f6feb",
+                      }}
+                    >
+                      Ingresar
+                    </Button>
+                  </Form.Item>
+                </Form>
+
+                <Flex
+                  vertical
+                  gap={4}
+                  style={{
+                    fontSize: 12,
+                    color: "#8b949e",
+                    borderTop: "1px solid #21262d",
+                    paddingTop: 16,
+                  }}
+                >
+                  <div>
+                    <strong style={{ color: "#58a6ff" }}>Admin:</strong>{" "}
+                    admin / admin123
+                  </div>
+                  <div>
+                    <strong style={{ color: "#4ade80" }}>Piloto:</strong>{" "}
+                    driver / driver123
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      fontSize: 11,
+                      textAlign: "center",
+                      color: "#484f58",
+                    }}
+                  >
+                    La sesión expira después de 8 horas
+                  </div>
+                </Flex>
+              </Flex>
+            </Card>
           </Flex>
-        </Card>
-      </Flex>
+        </Flex>
+      </ConfigProvider>
     </>
   );
 };
