@@ -91,7 +91,10 @@ export const AdminPage: React.FC = () => {
 
   const onUpdateOrder = async (values: Partial<OrderEntity>) => {
     if (!editingOrder) return;
-    await updateOrderMutation.mutateAsync({ id: editingOrder.id, data: values });
+    await updateOrderMutation.mutateAsync({
+      id: editingOrder.id,
+      data: values,
+    });
     setOpenEditOrderModal(false);
     setEditingOrder(null);
     editOrderForm.resetFields();
@@ -218,11 +221,11 @@ export const AdminPage: React.FC = () => {
               key={order.id}
               extra={
                 <Flex gap="small">
-                  <Button
+                  {/* <Button
                     size="small"
                     icon={<EditOutlined />}
                     onClick={() => onOpenEditOrder(order)}
-                  />
+                  /> */}
                   {activeItem === order.id && items.length === 0 && (
                     <Popconfirm
                       title="Eliminar orden"
@@ -442,8 +445,16 @@ export const AdminPage: React.FC = () => {
                                           <Button
                                             size="small"
                                             icon={<EyeOutlined />}
-                                            loading={getImageSignedUrlMutation.isPending && getImageSignedUrlMutation.variables === item.voucherKey}
-                                            onClick={() => onViewVoucherImage(item.voucherKey!)}
+                                            loading={
+                                              getImageSignedUrlMutation.isPending &&
+                                              getImageSignedUrlMutation.variables ===
+                                                item.voucherKey
+                                            }
+                                            onClick={() =>
+                                              onViewVoucherImage(
+                                                item.voucherKey!,
+                                              )
+                                            }
                                           />
                                         )}
                                         <Button
@@ -451,27 +462,29 @@ export const AdminPage: React.FC = () => {
                                           icon={<EditOutlined />}
                                           onClick={() => onOpenEditItem(item)}
                                         />
-                                        <Popconfirm
-                                          title="Eliminar pedido"
-                                          description="¿Estás seguro de eliminar este pedido?"
-                                          okText="Sí"
-                                          cancelText="No"
-                                          onConfirm={() =>
-                                            onDeleteItem(
-                                              item.voucherId,
-                                              item.orderId
-                                            )
-                                          }
-                                        >
-                                          <Button
-                                            size="small"
-                                            danger
-                                            icon={<DeleteOutlined />}
-                                            loading={
-                                              deleteItemMutation.isPending
+                                        {item.status === "PENDIENTE" && (
+                                          <Popconfirm
+                                            title="Eliminar pedido"
+                                            description="¿Estás seguro de eliminar este pedido?"
+                                            okText="Sí"
+                                            cancelText="No"
+                                            onConfirm={() =>
+                                              onDeleteItem(
+                                                item.voucherId,
+                                                item.orderId,
+                                              )
                                             }
-                                          />
-                                        </Popconfirm>
+                                          >
+                                            <Button
+                                              size="small"
+                                              danger
+                                              icon={<DeleteOutlined />}
+                                              loading={
+                                                deleteItemMutation.isPending
+                                              }
+                                            />
+                                          </Popconfirm>
+                                        )}
                                       </Flex>
                                     ),
                                     children: (
@@ -521,7 +534,9 @@ export const AdminPage: React.FC = () => {
                                           </Flex>
 
                                           <Typography.Text>
-                                            {formatTimeAgo(item.createdAt * 1000)}
+                                            {formatTimeAgo(
+                                              item.createdAt * 1000,
+                                            )}
                                           </Typography.Text>
                                         </Flex>
                                         <Flex gap="middle">
@@ -678,7 +693,11 @@ export const AdminPage: React.FC = () => {
         footer={null}
         onCancel={() => setVoucherImageUrl(undefined)}
       >
-        <img src={voucherImageUrl} alt="comprobante" style={{ width: "100%" }} />
+        <img
+          src={voucherImageUrl}
+          alt="comprobante"
+          style={{ width: "100%" }}
+        />
       </Modal>
     </>
   );

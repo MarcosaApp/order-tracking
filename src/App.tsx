@@ -27,7 +27,8 @@ const layoutStyle = {
 
 const headerStyle: React.CSSProperties = {
   height: "10vh",
-  backgroundColor: "black",
+  backgroundColor: "white",
+  padding: 20,
 };
 
 const contentStyle: React.CSSProperties = {
@@ -60,7 +61,9 @@ function App() {
         } else if (sessionString) {
           // Invalid or expired session
           localStorage.removeItem(SESSION_STORAGE_KEY);
-          messageApi.warning("Sesión expirada o inválida. Por favor inicie sesión nuevamente.");
+          messageApi.warning(
+            "Sesión expirada o inválida. Por favor inicie sesión nuevamente.",
+          );
         }
       } catch (error) {
         console.error("Error checking session:", error);
@@ -86,7 +89,9 @@ function App() {
           setIsAuthenticated(false);
           setUserRole(null);
           setUsername("");
-          messageApi.warning("Su sesión ha expirado o ha sido modificada. Por favor inicie sesión nuevamente.");
+          messageApi.warning(
+            "Su sesión ha expirado o ha sido modificada. Por favor inicie sesión nuevamente.",
+          );
         }
       } catch (error) {
         console.error("Error checking session expiration:", error);
@@ -147,7 +152,7 @@ function App() {
       theme={{
         algorithm: theme.defaultAlgorithm,
         token: {
-          colorPrimary: "#1890ff", // Daybreak Blue
+          colorPrimary: "#1890ff",
           colorInfo: "#1890ff",
           colorLink: "#1890ff",
           borderRadius: 6,
@@ -160,34 +165,35 @@ function App() {
           <Layout style={layoutStyle}>
             <>{contextHolder}</>
             <Header style={headerStyle}>
-              <Flex justify="space-between" align="center" style={{ height: "100%", padding: "0 20px" }}>
-                <Image src={logo} height={"inherit"} preview={false}></Image>
-                <Flex gap="small" align="center">
-                  <Flex vertical align="end" style={{ marginRight: 8 }}>
-                    <Typography.Text style={{ color: "white", fontSize: "12px" }}>
-                      {username}
-                    </Typography.Text>
-                    <Tag color={userRole === "admin" ? "blue" : "green"} style={{ fontSize: "11px", padding: "2px 8px", margin: 0 }}>
+              <Flex
+                justify={"space-between"}
+                align={"center"}
+                style={{ height: "100%" }}
+              >
+                <Flex style={{ width: "50%" }}>
+                  <Image src={logo} preview={false} />
+                </Flex>
+
+                <Flex gap={"small"}>
+                  <Flex gap="medium" align="center">
+                    <Tag
+                      color={userRole === "admin" ? "blue" : "green"}
+                      style={{ fontSize: "12px", margin: 0 }}
+                    >
                       {userRole === "admin" ? "ADMINISTRADOR" : "PILOTO"}
                     </Tag>
                   </Flex>
                   <Button
-                    type="primary"
+                    type="text"
                     danger
                     icon={<LogoutOutlined />}
                     onClick={handleLogout}
-                  >
-                    Salir
-                  </Button>
+                  />
                 </Flex>
               </Flex>
             </Header>
             <Content style={contentStyle}>
-              {userRole === "admin" ? (
-                <AdminPage />
-              ) : (
-                <DriverPage />
-              )}
+              {userRole === "admin" ? <AdminPage /> : <DriverPage />}
             </Content>
           </Layout>
         </Col>

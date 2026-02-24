@@ -49,12 +49,12 @@ export const DriverPage: React.FC = () => {
   const searchMutation = useSearchItem();
   const { data: collects = [], refetch: refetchCollects } = useCollects(
     searchedItem?.voucherId || "",
-    activeCollapse === "collect" && !!searchedItem
+    activeCollapse === "collect" && !!searchedItem,
   );
   const createCollectMutation = useCreateCollect();
   const { data: deliveries = [], refetch: refetchDeliveries } = useDeliveries(
     searchedItem?.voucherId || "",
-    activeCollapse === "delivery" && !!searchedItem
+    activeCollapse === "delivery" && !!searchedItem,
   );
   const createDeliveryMutation = useCreateDelivery();
 
@@ -303,7 +303,7 @@ export const DriverPage: React.FC = () => {
 
                                         <Typography.Text>
                                           {formatTimeAgo(
-                                            collect.createdAt! * 1000
+                                            collect.createdAt! * 1000,
                                           )}
                                         </Typography.Text>
                                       </Flex>
@@ -483,7 +483,7 @@ export const DriverPage: React.FC = () => {
 
                                         <Typography.Text>
                                           {formatTimeAgo(
-                                            delivery.createdAt! * 1000
+                                            delivery.createdAt! * 1000,
                                           )}
                                         </Typography.Text>
                                       </Flex>
@@ -535,20 +535,20 @@ export const DriverPage: React.FC = () => {
                                             5,
                                             2,
                                             80,
-                                            35
+                                            35,
                                           );
 
                                           doc.setFont(
                                             "Helvetica",
                                             "normal",
-                                            "bold"
+                                            "bold",
                                           );
 
                                           doc.text(
                                             `# ${delivery.createdAt?.toString(36).toUpperCase()}`,
                                             pageWidth - 10,
                                             23,
-                                            { align: "right" }
+                                            { align: "right" },
                                           );
 
                                           doc.setFontSize(12);
@@ -559,7 +559,7 @@ export const DriverPage: React.FC = () => {
                                             `${new Date(delivery.createdAt! * 1000).toLocaleString()}`,
                                             pageWidth - 10,
                                             50,
-                                            { align: "right" }
+                                            { align: "right" },
                                           );
 
                                           doc.setFontSize(13);
@@ -573,7 +573,7 @@ export const DriverPage: React.FC = () => {
                                             `${delivery.customer}`,
                                             pageWidth - 10,
                                             70,
-                                            { align: "right" }
+                                            { align: "right" },
                                           );
 
                                           doc.text("Entregado por:", 10, 80, {
@@ -584,7 +584,7 @@ export const DriverPage: React.FC = () => {
                                             delivery.driver,
                                             pageWidth - 10,
                                             80,
-                                            { align: "right" }
+                                            { align: "right" },
                                           );
 
                                           doc.text("Camion:", 10, 90, {
@@ -595,7 +595,7 @@ export const DriverPage: React.FC = () => {
                                             delivery.truck,
                                             pageWidth - 10,
                                             90,
-                                            { align: "right" }
+                                            { align: "right" },
                                           );
 
                                           doc.text("Producto:", 10, 100, {
@@ -606,7 +606,7 @@ export const DriverPage: React.FC = () => {
                                             `${searchedItem.product}`,
                                             pageWidth - 10,
                                             100,
-                                            { align: "right" }
+                                            { align: "right" },
                                           );
 
                                           doc.text("Cantidad:", 10, 110, {
@@ -617,14 +617,14 @@ export const DriverPage: React.FC = () => {
                                             `${delivery.quantity}`,
                                             pageWidth - 10,
                                             110,
-                                            { align: "right" }
+                                            { align: "right" },
                                           );
 
                                           const randomDocId =
                                             Date.now().toString(36);
 
                                           doc.save(
-                                            `pedido-${delivery.voucherId}-${randomDocId.slice(4, randomDocId.length)}.pdf`
+                                            `pedido-${delivery.voucherId}-${randomDocId.slice(4, randomDocId.length)}.pdf`,
                                           );
                                         }}
                                       >
