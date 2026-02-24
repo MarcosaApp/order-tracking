@@ -83,12 +83,6 @@ export const AdminPage: React.FC = () => {
     await deleteOrderMutation.mutateAsync(id);
   };
 
-  const onOpenEditOrder = (order: OrderEntity) => {
-    setEditingOrder(order);
-    editOrderForm.setFieldsValue({ status: order.status });
-    setOpenEditOrderModal(true);
-  };
-
   const onUpdateOrder = async (values: Partial<OrderEntity>) => {
     if (!editingOrder) return;
     await updateOrderMutation.mutateAsync({
@@ -188,7 +182,6 @@ export const AdminPage: React.FC = () => {
         vertical
         style={{
           height: "10%",
-          padding: "12px",
         }}
       >
         <Button
@@ -209,8 +202,7 @@ export const AdminPage: React.FC = () => {
         style={{
           overflow: "scroll",
           height: "90%",
-          padding: "8px",
-          background: "black",
+          background: "#0d1117",
         }}
       >
         {orders.length ? (

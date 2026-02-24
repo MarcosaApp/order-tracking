@@ -103,11 +103,7 @@ export const DriverPage: React.FC = () => {
 
   return (
     <>
-      <Flex
-        align="center"
-        justify={"space-between"}
-        style={{ height: "10%", padding: "12px" }}
-      >
+      <Flex align="center" justify={"space-between"} style={{ height: "10%" }}>
         <SearchText
           enterButton
           loading={searchMutation.isPending}
@@ -122,8 +118,7 @@ export const DriverPage: React.FC = () => {
         style={{
           overflow: "scroll",
           height: "90%",
-          padding: "8px",
-          background: "black",
+          background: "#0d1117",
         }}
       >
         {searchedItem ? (

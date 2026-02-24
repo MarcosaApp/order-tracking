@@ -75,30 +75,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
             gap={32}
             style={{ width: 400, padding: "0 16px" }}
           >
-            {/* Logo */}
-            <Flex align="center" gap={10}>
-              <span
-                style={{
-                  fontSize: 34,
-                  lineHeight: 1,
-                  filter: "drop-shadow(0 0 10px #58a6ff)",
-                }}
-              >
-                ⬡
-              </span>
-              <span
-                style={{
-                  fontFamily: "'Syne', sans-serif",
-                  fontWeight: 800,
-                  fontSize: 26,
-                  color: "#e6edf3",
-                  letterSpacing: "-0.5px",
-                }}
-              >
-                OrderFlow
-              </span>
-            </Flex>
-
             {/* Card */}
             <Card
               style={{
@@ -181,36 +157,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                     </Button>
                   </Form.Item>
                 </Form>
-
-                <Flex
-                  vertical
-                  gap={4}
-                  style={{
-                    fontSize: 12,
-                    color: "#8b949e",
-                    borderTop: "1px solid #21262d",
-                    paddingTop: 16,
-                  }}
-                >
-                  <div>
-                    <strong style={{ color: "#58a6ff" }}>Admin:</strong>{" "}
-                    admin / admin123
-                  </div>
-                  <div>
-                    <strong style={{ color: "#4ade80" }}>Piloto:</strong>{" "}
-                    driver / driver123
-                  </div>
-                  <div
-                    style={{
-                      marginTop: 8,
-                      fontSize: 11,
-                      textAlign: "center",
-                      color: "#484f58",
-                    }}
-                  >
-                    La sesión expira después de 8 horas
-                  </div>
-                </Flex>
               </Flex>
             </Card>
           </Flex>
