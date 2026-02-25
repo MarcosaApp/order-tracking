@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { message } from "antd";
 import { orderService } from "../services/order.service";
 import type { ItemEntity, OrderEntity } from "../interfaces/entities";
@@ -39,6 +39,18 @@ export const useCreateOrder = () => {
   });
 };
 
+// Get all items with cursor pagination
+export const useAllItems = (enabled = true) => {
+  return useInfiniteQuery({
+    queryKey: ["items", "all"],
+    queryFn: ({ pageParam }) =>
+      orderService.getAllItems(pageParam as Record<string, any> | undefined),
+    initialPageParam: undefined as Record<string, any> | undefined,
+    getNextPageParam: (lastPage) => lastPage.cursor ?? undefined,
+    enabled,
+  });
+};
+
 // Get items by order
 export const useOrderItems = (orderId: string, enabled = true) => {
   return useQuery({
@@ -57,12 +69,12 @@ export const useCreateItem = () => {
   return useMutation({
     mutationFn: (item: Partial<ItemEntity>) => orderService.createItem(item),
     onSuccess: (_data, variables) => {
-      // Invalidate the specific order's items
       if (variables.orderId) {
         queryClient.invalidateQueries({
           queryKey: orderKeys.items(variables.orderId),
         });
       }
+      queryClient.invalidateQueries({ queryKey: ["items", "all"] });
       messageApi.success("Pedido creado exitosamente");
     },
     onError: (error: Error) => {
@@ -145,6 +157,7 @@ export const useDeleteItem = () => {
       queryClient.invalidateQueries({
         queryKey: orderKeys.items(variables.orderId),
       });
+      queryClient.invalidateQueries({ queryKey: ["items", "all"] });
       messageApi.success("Pedido eliminado exitosamente");
     },
     onError: (error: Error) => {
@@ -171,6 +184,7 @@ export const useUpdateItem = () => {
       queryClient.invalidateQueries({
         queryKey: orderKeys.items(variables.orderId),
       });
+      queryClient.invalidateQueries({ queryKey: ["items", "all"] });
       messageApi.success("Pedido actualizado exitosamente");
     },
     onError: (error: Error) => {

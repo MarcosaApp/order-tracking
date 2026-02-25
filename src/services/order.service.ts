@@ -25,6 +25,13 @@ export const orderService = {
     apiClient.post<OrderEntity>("/order"),
 
   // Items
+  getAllItems: (cursor?: Record<string, any>) => {
+    const params = cursor
+      ? `?cursor=${encodeURIComponent(JSON.stringify(cursor))}`
+      : "";
+    return apiClient.get<QueryResponse<ItemEntity>>(`/manager/items${params}`);
+  },
+
   getItemsByOrder: (orderId: string) =>
     apiClient.get<QueryResponse<ItemEntity>>(`/manager/items/${orderId}`),
 

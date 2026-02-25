@@ -8,6 +8,7 @@ import {
   InputNumber,
   Modal,
   Popconfirm,
+  Segmented,
   Select,
   Spin,
   Tag,
@@ -36,6 +37,7 @@ import {
   useCreateItem,
   useUploadImage,
   useGetImageSignedUrl,
+  useAllItems,
   useDeleteOrder,
   useUpdateOrder,
   useDeleteItem,
@@ -55,10 +57,19 @@ export const AdminPage: React.FC = () => {
   const [openEditItemModal, setOpenEditItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemEntity | null>(null);
   const [voucherImageUrl, setVoucherImageUrl] = useState<string | undefined>();
+  const [activeView, setActiveView] = useState<"orders" | "items">("orders");
 
   // React Query hooks
   const { data: orders = [], isLoading: ordersLoading } = useOrders();
   const createOrderMutation = useCreateOrder();
+  const {
+    data: allItemsData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: allItemsLoading,
+  } = useAllItems(activeView === "items");
+  const allItems = allItemsData?.pages.flatMap((p) => p.items ?? []) ?? [];
   const { data: items = [] } = useOrderItems(activeItem, !!activeItem);
   const createItemMutation = useCreateItem();
   const uploadImageMutation = useUploadImage();
@@ -177,35 +188,125 @@ export const AdminPage: React.FC = () => {
   return (
     <>
       <Flex
-        align="start"
-        justify={"center"}
         vertical
-        style={{
-          height: "10%",
-        }}
+        gap="middle"
+        style={{ height: "15%", padding: "20px 0px" }}
       >
-        <Button
-          type="primary"
-          htmlType="submit"
-          style={{ width: "100%" }}
-          onClick={onCreateOrder}
-          loading={createOrderMutation.isPending}
-        >
-          CREAR ORDEN
-        </Button>
+        <Segmented
+          block
+          value={activeView}
+          onChange={(v) => setActiveView(v as "orders" | "items")}
+          options={[
+            { label: "ÓRDENES", value: "orders" },
+            { label: "PEDIDOS", value: "items" },
+          ]}
+        />
+        {activeView === "orders" && (
+          <Button
+            type="primary"
+            style={{ width: "100%" }}
+            onClick={onCreateOrder}
+            loading={createOrderMutation.isPending}
+          >
+            CREAR ORDEN
+          </Button>
+        )}
       </Flex>
 
       <Flex
         className="hide-scrollbar"
         vertical
-        gap="small"
+        gap="middle"
         style={{
           overflow: "scroll",
-          height: "90%",
+          height: "85%",
           background: "#0d1117",
+          padding: "0",
         }}
       >
-        {orders.length ? (
+        {activeView === "items" ? (
+          <>
+            {allItemsLoading ? (
+              <Flex justify="center" align="center" style={{ flex: 1 }}>
+                <Spin size="large" />
+              </Flex>
+            ) : allItems.length > 0 ? (
+              <>
+                {allItems.map((item) => (
+                  <Card
+                    key={item.id}
+                    size="small"
+                    title={`Comprobante - ${item.voucherId}`}
+                    extra={
+                      <Flex gap="small">
+                        {item.voucherKey && (
+                          <Button
+                            size="small"
+                            icon={<EyeOutlined />}
+                            loading={
+                              getImageSignedUrlMutation.isPending &&
+                              getImageSignedUrlMutation.variables === item.voucherKey
+                            }
+                            onClick={() => onViewVoucherImage(item.voucherKey!)}
+                          />
+                        )}
+                      </Flex>
+                    }
+                  >
+                    <Flex vertical gap="small">
+                      <Flex justify="space-between">
+                        <Flex gap="middle">
+                          <Typography.Text>Estado:</Typography.Text>
+                          {item.status === "PENDIENTE" && (
+                            <Tag color="error" icon={<CloseCircleOutlined />} variant="solid">
+                              {item.status}
+                            </Tag>
+                          )}
+                          {item.status === "EN RUTA" && (
+                            <Tag color="processing" icon={<SyncOutlined />} variant="solid">
+                              {item.status}
+                            </Tag>
+                          )}
+                          {item.status === "RECOLECTADO" && (
+                            <Tag color="success" icon={<CheckCircleOutlined />} variant="solid">
+                              {item.status}
+                            </Tag>
+                          )}
+                        </Flex>
+                        <Typography.Text>
+                          {formatTimeAgo(item.createdAt * 1000)}
+                        </Typography.Text>
+                      </Flex>
+                      <Flex gap="middle">
+                        <Typography.Text>Producto:</Typography.Text>
+                        <Typography.Text strong>{item.product}</Typography.Text>
+                      </Flex>
+                      <Flex justify="space-between" align="center">
+                        <Typography.Text>Cantidad:</Typography.Text>
+                        <Title level={3} style={{ margin: 0 }}>
+                          {item.quantity}/{item.collected}
+                        </Title>
+                      </Flex>
+                    </Flex>
+                  </Card>
+                ))}
+                {hasNextPage && (
+                  <Button
+                    style={{ width: "100%", marginTop: 8 }}
+                    loading={isFetchingNextPage}
+                    onClick={() => fetchNextPage()}
+                  >
+                    Cargar más
+                  </Button>
+                )}
+              </>
+            ) : (
+              <Flex justify="center" align="center" style={{ flex: 1 }}>
+                <Typography.Text type="secondary">Sin pedidos</Typography.Text>
+              </Flex>
+            )}
+          </>
+        ) : orders.length ? (
           orders.map((order) => (
             <Card
               title={`ORDEN - ${order.createdAt.toString(36).toUpperCase()}`}
