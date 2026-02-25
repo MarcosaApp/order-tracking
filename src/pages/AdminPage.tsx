@@ -58,6 +58,8 @@ export const AdminPage: React.FC = () => {
   const [editingItem, setEditingItem] = useState<ItemEntity | null>(null);
   const [voucherImageUrl, setVoucherImageUrl] = useState<string | undefined>();
   const [activeView, setActiveView] = useState<"orders" | "items">("orders");
+  const [timeFilter, setTimeFilter] = useState<"all" | "lt3days" | "gt15days">("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   // React Query hooks
   const { data: orders = [], isLoading: ordersLoading } = useOrders();
@@ -70,6 +72,13 @@ export const AdminPage: React.FC = () => {
     isLoading: allItemsLoading,
   } = useAllItems(activeView === "items");
   const allItems = allItemsData?.pages.flatMap((p) => p.items ?? []) ?? [];
+  const filteredItems = allItems.filter((item) => {
+    const age = Date.now() - item.createdAt * 1000;
+    if (timeFilter === "lt3days" && age >= 3 * 24 * 60 * 60 * 1000) return false;
+    if (timeFilter === "gt15days" && age <= 15 * 24 * 60 * 60 * 1000) return false;
+    if (statusFilter !== "all" && item.status !== statusFilter) return false;
+    return true;
+  });
   const { data: items = [] } = useOrderItems(activeItem, !!activeItem);
   const createItemMutation = useCreateItem();
   const uploadImageMutation = useUploadImage();
@@ -201,7 +210,7 @@ export const AdminPage: React.FC = () => {
             { label: "PEDIDOS", value: "items" },
           ]}
         />
-        {activeView === "orders" && (
+        {activeView === "orders" ? (
           <Button
             type="primary"
             style={{ width: "100%" }}
@@ -210,6 +219,32 @@ export const AdminPage: React.FC = () => {
           >
             CREAR ORDEN
           </Button>
+        ) : (
+          <Flex gap="small">
+            <Select
+              size="middle"
+              style={{ flex: 1 }}
+              value={timeFilter}
+              onChange={(v) => setTimeFilter(v)}
+              options={[
+                { value: "all", label: "Todo el tiempo" },
+                { value: "lt3days", label: "Menos de 3 días" },
+                { value: "gt15days", label: "Más de 15 días" },
+              ]}
+            />
+            <Select
+              size="middle"
+              style={{ flex: 1 }}
+              value={statusFilter}
+              onChange={(v) => setStatusFilter(v)}
+              options={[
+                { value: "all", label: "Todos los estados" },
+                { value: "PENDIENTE", label: "PENDIENTE" },
+                { value: "EN RUTA", label: "EN RUTA" },
+                { value: "RECOLECTADO", label: "RECOLECTADO" },
+              ]}
+            />
+          </Flex>
         )}
       </Flex>
 
@@ -230,9 +265,9 @@ export const AdminPage: React.FC = () => {
               <Flex justify="center" align="center" style={{ flex: 1 }}>
                 <Spin size="large" />
               </Flex>
-            ) : allItems.length > 0 ? (
+            ) : filteredItems.length > 0 ? (
               <>
-                {allItems.map((item) => (
+                {filteredItems.map((item) => (
                   <Card
                     key={item.id}
                     size="small"
