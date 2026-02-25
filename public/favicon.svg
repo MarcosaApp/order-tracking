@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background -->
+  <rect width="32" height="32" rx="7" fill="#0d1117"/>
+  <!-- Top face of box -->
+  <polygon points="16,4 27,9.5 16,15 5,9.5" fill="#1f6feb"/>
+  <!-- Left face of box -->
+  <polygon points="5,9.5 16,15 16,27 5,21.5" fill="#1251a3"/>
+  <!-- Right face of box -->
+  <polygon points="27,9.5 16,15 16,27 27,21.5" fill="#1565c0"/>
+  <!-- Tape on top face (horizontal) -->
+  <line x1="5" y1="9.5" x2="27" y2="9.5" stroke="white" stroke-width="1" stroke-opacity="0.35"/>
+  <!-- Tape on top face (vertical) -->
+  <line x1="16" y1="4" x2="16" y2="15" stroke="white" stroke-width="1" stroke-opacity="0.35"/>
+  <!-- Tape on left face -->
+  <line x1="5" y1="9.5" x2="16" y2="15" stroke="white" stroke-width="1" stroke-opacity="0.2"/>
+  <line x1="5" y1="15.5" x2="16" y2="21" stroke="white" stroke-width="1" stroke-opacity="0.2"/>
+  <!-- Tape on right face -->
+  <line x1="16" y1="15" x2="27" y2="9.5" stroke="white" stroke-width="1" stroke-opacity="0.2"/>
+  <line x1="16" y1="21" x2="27" y2="15.5" stroke="white" stroke-width="1" stroke-opacity="0.2"/>
+</svg>

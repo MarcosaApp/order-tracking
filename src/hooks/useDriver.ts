@@ -77,7 +77,7 @@ export const useCreateDelivery = () => {
   return useMutation({
     mutationFn: (delivery: Partial<DeliveryEntity>) =>
       orderService.createDelivery(delivery),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       if (variables.voucherId) {
         queryClient.invalidateQueries({
           queryKey: driverKeys.deliveries(variables.voucherId),
